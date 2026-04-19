@@ -368,9 +368,6 @@ def make_task_bash_script(codegen: str,
         textwrap.dedent(f"""\
             #!/bin/bash
             source ~/.bashrc
-            set -a
-            . $(conda info --base 2> /dev/null)/etc/profile.d/conda.sh > /dev/null 2>&1 || true
-            set +a
             {constants.DEACTIVATE_SKY_REMOTE_PYTHON_ENV}
             export PYTHONUNBUFFERED=1
             cd {constants.SKY_REMOTE_WORKDIR}"""),
@@ -408,22 +405,32 @@ def run_bash_command_with_log(bash_command: str,
                               stream_logs: bool = False,
                               with_ray: bool = False,
                               streaming_prefix: Optional[str] = None):
+    import time as _t
+    _t0 = _t.perf_counter()
     with tempfile.NamedTemporaryFile('w', prefix='sky_app_',
                                      delete=False) as fp:
         bash_command = make_task_bash_script(bash_command, env_vars=env_vars)
         fp.write(bash_command)
         fp.flush()
         script_path = fp.name
+    _t1 = _t.perf_counter()
+    print(f'PERF run_bash_cmd write_script: {_t1-_t0:.3f}s', flush=True)
 
-        # Need this `-i` option to make sure `source ~/.bashrc` work.
-        inner_command = f'/bin/bash -i {script_path}'
+    # The script already contains `source ~/.bashrc` and conda init
+    # explicitly, so `-i` (interactive mode) is not needed and doubles
+    # the ~/.bashrc load time (~3s on nodes with conda init).
+    inner_command = f'/bin/bash {script_path}'
 
-        return run_with_log(inner_command,
-                            log_path,
-                            stream_logs=stream_logs,
-                            with_ray=with_ray,
-                            streaming_prefix=streaming_prefix,
-                            shell=True)
+    result = run_with_log(inner_command,
+                          log_path,
+                          stream_logs=stream_logs,
+                          with_ray=with_ray,
+                          streaming_prefix=streaming_prefix,
+                          shell=True)
+    print(f'PERF run_bash_cmd run_with_log: {_t.perf_counter()-_t1:.3f}s '
+          f'(bash -i total={_t.perf_counter()-_t0:.3f}s)',
+          flush=True)
+    return result
 
 
 def run_bash_command_with_log_and_return_pid(
@@ -433,6 +440,8 @@ def run_bash_command_with_log_and_return_pid(
         stream_logs: bool = False,
         with_ray: bool = False,
         streaming_prefix: Optional[str] = None):
+    import time as _t
+    print(f'PERF remote_fn_start wall={_t.time():.3f}', flush=True)
     return_code = run_bash_command_with_log(bash_command,
                                             log_path,
                                             env_vars,
@@ -479,7 +488,10 @@ def _follow_job_logs(file,
             ]:
                 if wait_last_logs:
                     # Wait all the logs are printed before exit.
-                    time.sleep(1 + SKY_LOG_TAILING_GAP_SECONDS)
+                    import time as _time
+                    _t_wl = _time.perf_counter()
+                    time.sleep(2 * SKY_LOG_TAILING_GAP_SECONDS)
+                    logger.warning(f'PERF _follow_job_logs wait_last_logs: {_time.perf_counter()-_t_wl:.3f}s status={status}')
                     wait_last_logs = False
                     continue
                 status_str = status.value if status is not None else 'None'
@@ -667,14 +679,19 @@ def tail_logs_iter(job_id: Optional[int],
     log_path = os.path.join(log_dir, 'run.log')
     log_path = os.path.expanduser(log_path)
 
+    import time as _time
+    _t0 = _time.perf_counter()
     status = job_lib.update_job_status([job_id], silent=True)[0]
+    logger.warning(f'PERF tail_logs_iter update_job_status: {_time.perf_counter()-_t0:.3f}s status={status}')
 
     # Wait for the log to be written. This is needed due to the `ray submit`
     # will take some time to start the job and write the log.
     retry_cnt = 0
+    _t_wait = _time.perf_counter()
     while status is not None and not status.is_terminal():
         retry_cnt += 1
         if os.path.exists(log_path) and status != job_lib.JobStatus.INIT:
+            logger.warning(f'PERF tail_logs_iter wait_for_log: {_time.perf_counter()-_t_wait:.3f}s retries={retry_cnt-1}')
             break
         if retry_cnt >= SKY_LOG_WAITING_MAX_RETRY:
             err = (f'{colorama.Fore.RED}ERROR: Logs for '
@@ -688,6 +705,8 @@ def tail_logs_iter(job_id: Optional[int],
         yield waiting + '\n'
         time.sleep(SKY_LOG_WAITING_GAP_SECONDS)
         status = job_lib.update_job_status([job_id], silent=True)[0]
+    else:
+        logger.warning(f'PERF tail_logs_iter wait_for_log (terminal): {_time.perf_counter()-_t_wait:.3f}s status={status}')
 
     start_stream_at = LOG_FILE_START_STREAMING_AT
     # Explicitly declare the type to avoid mypy warning.

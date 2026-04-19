@@ -1,0 +1,5 @@
+  # test_conda.yaml                                                                                                                                                                                                 
+  run: |                                                                                                                                                                                                            
+    conda activate base                                                                                                                                                                                             
+    python --version                                                                                                                                                                                                
+    conda env list

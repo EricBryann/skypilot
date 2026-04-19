@@ -1266,17 +1266,23 @@ def tail_logs(cluster_name: str,
           script.
 
     """
+    import time as _time
     # Check the status of the cluster.
+    _t0 = _time.perf_counter()
     handle = backend_utils.check_cluster_available(
         cluster_name,
         operation='tailing logs',
     )
+    logger.warning(f'PERF tail_logs check_cluster_available: {_time.perf_counter()-_t0:.3f}s')
     backend = backend_utils.get_backend_from_handle(handle)
 
     usage_lib.record_cluster_name_for_current_operation(cluster_name)
     # Although tail_logs returns an int when require_outputs=False (default),
     # we need to check returnval as an int to avoid type checking errors.
+    _t1 = _time.perf_counter()
+    logger.warning(f'PERF tail_logs start wall={_time.time():.3f}')
     returnval = backend.tail_logs(handle, job_id, follow=follow, tail=tail)
+    logger.warning(f'PERF tail_logs backend.tail_logs: {_time.perf_counter()-_t1:.3f}s')
     assert isinstance(returnval,
                       int), (f'returnval must be an int, but got {returnval}')
     return returnval

@@ -1,6 +1,7 @@
 """gRPC service implementations for skylet."""
 
 import os
+import time
 from typing import List, Optional
 
 import grpc
@@ -172,11 +173,14 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
             self, request: jobsv1_pb2.AddJobRequest,
             context: grpc.ServicerContext) -> jobsv1_pb2.AddJobResponse:
         try:
+            _t0 = time.perf_counter()
             job_name = request.job_name if request.HasField('job_name') else '-'
             job_id, log_dir = job_lib.add_job(job_name, request.username,
                                               request.run_timestamp,
                                               request.resources_str,
                                               request.metadata)
+            logger.warning(f'PERF AddJob total: {time.perf_counter()-_t0:.3f}s '
+                           f'job_id={job_id}')
             return jobsv1_pb2.AddJobResponse(job_id=job_id, log_dir=log_dir)
         except Exception as e:  # pylint: disable=broad-except
             context.abort(grpc.StatusCode.INTERNAL, str(e))
@@ -185,12 +189,15 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
             self, request: jobsv1_pb2.QueueJobRequest,
             context: grpc.ServicerContext) -> jobsv1_pb2.QueueJobResponse:
         try:
+            _t0 = time.perf_counter()
             job_id = request.job_id
             # Create log directory and file
             remote_log_dir = os.path.expanduser(request.remote_log_dir)
             os.makedirs(remote_log_dir, exist_ok=True)
             remote_log_path = os.path.join(remote_log_dir, 'run.log')
             open(remote_log_path, 'a').close()  # pylint: disable=unspecified-encoding
+            _t1 = time.perf_counter()
+            logger.warning(f'PERF QueueJob mkdir+touch: {_t1-_t0:.3f}s')
 
             script_path = os.path.expanduser(request.script_path)
             os.makedirs(os.path.dirname(script_path), exist_ok=True)
@@ -201,6 +208,8 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
                 with open(script_path, 'w', encoding='utf-8') as f:
                     f.write(request.codegen)
                 os.chmod(script_path, 0o755)
+            _t2 = time.perf_counter()
+            logger.warning(f'PERF QueueJob write_script: {_t2-_t1:.3f}s')
 
             job_submit_cmd = (
                 # JOB_CMD_IDENTIFIER is used for identifying the process
@@ -211,6 +220,9 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
                 # Note that the order of ">filename 2>&1" matters.
                 f' > {remote_log_path} 2>&1')
             job_lib.scheduler.queue(job_id, job_submit_cmd)
+            _t3 = time.perf_counter()
+            logger.warning(f'PERF QueueJob scheduler.queue: {_t3-_t2:.3f}s')
+            logger.warning(f'PERF QueueJob total: {_t3-_t0:.3f}s job_id={job_id}')
             return jobsv1_pb2.QueueJobResponse()
         except Exception as e:  # pylint: disable=broad-except
             context.abort(grpc.StatusCode.INTERNAL, str(e))

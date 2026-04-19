@@ -281,11 +281,18 @@ class JobScheduler:
     @init_db
     def queue(self, job_id: int, cmd: str) -> None:
         assert _DB is not None
+        _t0 = time.perf_counter()
         _DB.cursor.execute('INSERT INTO pending_jobs VALUES (?,?,?,?)',
                            (job_id, cmd, 0, int(time.time())))
         _DB.conn.commit()
+        _t1 = time.perf_counter()
+        logger.warning(f'PERF job_lib.queue insert+commit: {_t1-_t0:.3f}s')
         set_status(job_id, JobStatus.PENDING)
+        _t2 = time.perf_counter()
+        logger.warning(f'PERF job_lib.queue set_status: {_t2-_t1:.3f}s')
         self.schedule_step()
+        logger.warning(f'PERF job_lib.queue schedule_step: '
+                       f'{time.perf_counter()-_t2:.3f}s')
 
     @init_db
     def remove_job_no_lock(self, job_id: int) -> None:
@@ -296,20 +303,30 @@ class JobScheduler:
     @init_db
     def _run_job(self, job_id: int, run_cmd: str):
         assert _DB is not None
+        _t0 = time.perf_counter()
         _DB.cursor.execute(
             (f'UPDATE pending_jobs SET submit={int(time.time())} '
              f'WHERE job_id={job_id!r}'))
         _DB.conn.commit()
+        _t1 = time.perf_counter()
+        logger.warning(f'PERF _run_job update_pending_jobs: {_t1-_t0:.3f}s')
         pid = subprocess_utils.launch_new_process_tree(run_cmd)
+        _t2 = time.perf_counter()
+        logger.warning(f'PERF _run_job launch_new_process_tree: {_t2-_t1:.3f}s '
+                       f'pid={pid}')
 
         _DB.cursor.execute((f'UPDATE jobs SET pid={pid} '
                             f'WHERE job_id={job_id!r}'))
         _DB.conn.commit()
+        logger.warning(f'PERF _run_job update_pid: {time.perf_counter()-_t2:.3f}s')
 
     def schedule_step(self, force_update_jobs: bool = False) -> None:
+        _t_ss = time.perf_counter()
         if force_update_jobs:
             update_status()
         pending_job_ids = self._get_pending_job_ids()
+        logger.warning(f'PERF schedule_step get_pending: '
+                       f'{time.perf_counter()-_t_ss:.3f}s ids={pending_job_ids}')
         # TODO(zhwu, mraheja): One optimization can be allowing more than one
         # job staying in the pending state after ray job submit, so that to be
         # faster to schedule a large amount of jobs.
@@ -389,6 +406,7 @@ def add_job(job_name: str,
             metadata: str = '{}') -> Tuple[int, str]:
     """Atomically reserve the next available job id for the user."""
     assert _DB is not None
+    _t0 = time.perf_counter()
     job_submitted_at = time.time()
     # job_id will autoincrement with the null value
     if int(constants.SKYLET_VERSION) >= 28:
@@ -402,13 +420,19 @@ def add_job(job_name: str,
             (job_name, username, job_submitted_at, JobStatus.INIT.value,
              run_timestamp, None, resources_str, metadata))
     _DB.conn.commit()
+    _t1 = time.perf_counter()
+    logger.warning(f'PERF add_job insert+commit: {_t1-_t0:.3f}s')
     rows = _DB.cursor.execute('SELECT job_id FROM jobs WHERE run_timestamp=(?)',
                               (run_timestamp,))
     for row in rows:
         job_id = row[0]
     assert job_id is not None
     log_dir = os.path.join(constants.SKY_LOGS_DIRECTORY, f'{job_id}-{job_name}')
+    _t2 = time.perf_counter()
+    logger.warning(f'PERF add_job select_job_id: {_t2-_t1:.3f}s')
     set_log_dir_no_lock(job_id, log_dir)
+    logger.warning(f'PERF add_job set_log_dir: {time.perf_counter()-_t2:.3f}s '
+                   f'total={time.perf_counter()-_t0:.3f}s job_id={job_id}')
     return job_id, log_dir
 
 

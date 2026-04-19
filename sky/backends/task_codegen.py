@@ -41,18 +41,23 @@ class TaskCodeGen:
         """Add common imports for both Ray and Slurm execution."""
         self._code.append(
             textwrap.dedent("""\
+            import collections
+            import copy
             import functools
             import getpass
             import hashlib
             import io
+            import multiprocessing.pool
             import os
             import pathlib
+            import queue as queue_lib
             import selectors
             import shlex
             import subprocess
             import sys
             import tempfile
             import textwrap
+            import threading
             import time
             from typing import Dict, List, Optional, Tuple, Union
             """))
@@ -288,7 +293,7 @@ class TaskCodeGen:
                 # scheduling more efficient.
                 job_lib.scheduler.schedule_step()
                 # This waits for all streaming logs to finish.
-                time.sleep(0.5)
+                time.sleep(0.1)
             """)
         ]
 
@@ -347,18 +352,23 @@ class RayCodeGen(TaskCodeGen):
         # Add Ray configuration
         self._code.append(
             textwrap.dedent(f"""\
+            import time as _perf_time
+            print(f'PERF script_start wall={{_perf_time.time():.3f}}', flush=True)
             kwargs = dict()
             # Only set the `_temp_dir` to SkyPilot's ray cluster directory when
             # the directory exists for backward compatibility for the VM
             # launched before #1790.
             if os.path.exists({constants.SKY_REMOTE_RAY_TEMPDIR!r}):
                 kwargs['_temp_dir'] = {constants.SKY_REMOTE_RAY_TEMPDIR!r}
+            _t_ray_init = _perf_time.perf_counter()
             ray.init(
                 address={ray_address!r},
                 namespace='__sky__{job_id}__',
                 log_to_driver=True,
                 **kwargs
             )
+            print(f'PERF ray.init: {{_perf_time.perf_counter()-_t_ray_init:.3f}}s',
+                  flush=True)
             def get_or_fail(futures, pg) -> List[int]:
                 \"\"\"Wait for tasks, if any fails, cancel all unready.\"\"\"
                 if not futures:
@@ -470,7 +480,10 @@ class RayCodeGen(TaskCodeGen):
             # FIXME: This will print the error message from autoscaler if
             # it is waiting for other task to finish. We should hide the
             # error message.
-            ray.get(pg.ready())"""))
+            _t_pg = _perf_time.perf_counter()
+            ray.get(pg.ready())
+            print(f'PERF ray.get(pg.ready()): {_perf_time.perf_counter()-_t_pg:.3f}s',
+                  flush=True)"""))
         self._add_job_started_msg()
 
         job_id = self.job_id
@@ -550,10 +563,18 @@ class RayCodeGen(TaskCodeGen):
         self._code += [
             textwrap.dedent(f"""\
                 @ray.remote
-                def check_ip():
+                def check_ip_and_warmup():
+                    # Pre-import all modules needed by
+                    # run_bash_command_with_log_and_return_pid so they are
+                    # cached in this worker process when real tasks run.
+                    import collections, copy, multiprocessing.pool
+                    import queue, threading
+                    from sky.utils import context, context_utils
+                    from sky.utils import log_utils, subprocess_utils, ux_utils
                     return ray.util.get_node_ip_address()
+                _t_check_ip = _perf_time.perf_counter()
                 gang_scheduling_id_to_ip = ray.get([
-                    check_ip.options(
+                    check_ip_and_warmup.options(
                             num_cpus={task_cpu_demand},
                             scheduling_strategy=ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
                                 placement_group=pg,
@@ -561,6 +582,8 @@ class RayCodeGen(TaskCodeGen):
                             )).remote()
                     for i in range(pg.bundle_count)
                 ])
+                print(f'PERF check_ip+warmup: {{_perf_time.perf_counter()-_t_check_ip:.3f}}s',
+                      flush=True)
 
                 cluster_ips_to_node_id = {{ip: i for i, ip in enumerate({stable_cluster_internal_ips!r})}}
                 job_ip_rank_list = sorted(gang_scheduling_id_to_ip, key=cluster_ips_to_node_id.get)
@@ -680,7 +703,17 @@ class RayCodeGen(TaskCodeGen):
 
     def add_epilogue(self) -> None:
         """Generates code that waits for all tasks, then exits."""
-        self._code.append('returncodes, _ = get_or_fail(futures, pg)')
+        self._code.append(
+            textwrap.dedent("""\
+            import time as _wall_time
+            _t_submit_wall = _wall_time.time()
+            _t_get_or_fail = _perf_time.perf_counter()
+            print(f'PERF futures_submitted wall={_t_submit_wall:.3f}', flush=True)
+            returncodes, _ = get_or_fail(futures, pg)
+            print(f'PERF get_or_fail (task execution): '
+                  f'{_perf_time.perf_counter()-_t_get_or_fail:.3f}s '
+                  f'wall={_wall_time.time():.3f}',
+                  flush=True)"""))
         super().add_epilogue()
 
 
