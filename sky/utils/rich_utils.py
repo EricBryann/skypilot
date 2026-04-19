@@ -62,6 +62,7 @@ class Control(enum.Enum):
     UPDATE = 'rich_update'
     HEARTBEAT = 'heartbeat'
     RETRY = 'retry'
+    REQUEST_DONE = 'request_done'
 
     def encode(self, msg: str) -> str:
         return f'<{self.value}>{msg}</{self.value}>'

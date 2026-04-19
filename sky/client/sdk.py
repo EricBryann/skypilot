@@ -162,6 +162,8 @@ def stream_response(request_id: Optional[server_common.RequestId[T]],
     try:
         line_count = 0
 
+        import time as _time
+        t = _time.perf_counter()
         for line in rich_utils.decode_rich_status(response):
             if line is not None:
                 line_count += 1
@@ -176,8 +178,16 @@ def stream_response(request_id: Optional[server_common.RequestId[T]],
                 elif line_count > retry_context.line_processed:
                     print(line, flush=True, end='', file=output_stream)
                     retry_context.line_processed = line_count
+        print(
+            f'PERF stream_response decode_rich_status: {_time.perf_counter() - t:.3f}s'
+        )
         if request_id is not None and get_result:
-            return get(request_id)
+            _t2 = _time.perf_counter()
+            result = get(request_id)
+            print(
+                f'PERF stream_response get(): {_time.perf_counter() - _t2:.3f}s'
+            )
+            return result
         else:
             return None
     except Exception:  # pylint: disable=broad-except
@@ -2265,6 +2275,8 @@ def stream_and_get(
         'follow': follow,
         'format': 'console',
     }
+    import time as _time
+    _t0 = _time.perf_counter()
     response = server_common.make_authenticated_request(
         'GET',
         '/api/stream',
@@ -2273,6 +2285,8 @@ def stream_and_get(
         timeout=(client_common.API_SERVER_REQUEST_CONNECTION_TIMEOUT_SECONDS,
                  None),
         stream=True)
+    print(
+        f'PERF stream_and_get HTTP connect: {_time.perf_counter() - _t0:.3f}s')
     if response.status_code in [404, 400]:
         detail = response.json().get('detail')
         with ux_utils.print_exception_no_traceback():
@@ -2289,11 +2303,16 @@ def stream_and_get(
         if request_id is None:
             return None
         return get(request_id)
-    return stream_response(request_id,
-                           response,
-                           output_stream,
-                           resumable=True,
-                           get_result=follow)
+    _t1 = _time.perf_counter()
+    result = stream_response(request_id,
+                             response,
+                             output_stream,
+                             resumable=True,
+                             get_result=follow)
+    print(
+        f'PERF stream_and_get stream_response: {_time.perf_counter() - _t1:.3f}s'
+    )
+    return result
 
 
 @usage_lib.entrypoint

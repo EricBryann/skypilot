@@ -34,6 +34,11 @@ class QueueBackend(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def get_block(self) -> Optional[Tuple[str, bool, bool]]:
+        """Non-blocking get. Returns None if queue is empty."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def qsize(self) -> int:
         """Return approximate queue size."""
         raise NotImplementedError
@@ -82,6 +87,12 @@ class LocalQueueBackend(QueueBackend):
         except queue_lib.Empty:
             return None
 
+    def get_block(self) -> Optional[Tuple[str, bool, bool]]:
+        try:
+            return self._queue.get(block=True)
+        except queue_lib.Empty:
+            return None
+
     def qsize(self) -> int:
         return self._queue.qsize()
 
@@ -101,6 +112,12 @@ class MultiprocessingQueueBackend(QueueBackend):
     def get(self) -> Optional[Tuple[str, bool, bool]]:
         try:
             return self._queue.get(block=False)
+        except queue_lib.Empty:
+            return None
+
+    def get_block(self) -> Optional[Tuple[str, bool, bool]]:
+        try:
+            return self._queue.get(block=True)
         except queue_lib.Empty:
             return None
 

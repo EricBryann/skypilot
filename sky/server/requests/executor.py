@@ -146,6 +146,16 @@ class RequestQueue:
         """
         return self._backend.get()
 
+    def get_block(self) -> Optional[Tuple[str, bool, bool]]:
+        """Get a request from the queue.
+
+        It is non-blocking if the queue is empty, and returns None.
+
+        Returns:
+            A tuple of request_id, ignore_return_value, and retryable.
+        """
+        return self._backend.get_block()
+
     def __len__(self) -> int:
         """Get the length of the queue."""
         return self._backend.qsize()
@@ -211,11 +221,15 @@ class RequestWorker:
     def process_request(self, executor: process.BurstableExecutor,
                         queue: RequestQueue) -> None:
         try:
-            request_element = queue.get()
+            request_element = queue.get_block()
+            import time as _time
+
+            # should not need this anymore
             if request_element is None:
                 time.sleep(0.1)
                 return
             request_id, ignore_return_value, _ = request_element
+            logger.warning(f"GET REQUEST: {_time.perf_counter()} {request_id}")
             request = api_requests.get_request(request_id, fields=['status'])
             assert request is not None, f'Request with ID {request_id} is None'
             if request.status == api_requests.RequestStatus.CANCELLED:
@@ -435,6 +449,8 @@ def _request_execution_wrapper(request_id: str,
     4. Handle the SIGTERM signal to abort the request gracefully.
     5. Maintain the lifecycle of the temp dir used by the request.
     """
+    import time as _time
+    logger.warning(f'_request_execution_wrapper 1: {_time.perf_counter()}')
     pid = multiprocessing.current_process().pid
     proc = psutil.Process(pid)
     rss_begin = proc.memory_info().rss
@@ -525,7 +541,11 @@ def _request_execution_wrapper(request_id: str,
                  labels(request=request_name, pid=pid).inc())
                 with metrics_utils.time_it(name=request_name,
                                            group='request_execution'):
+                    logger.warning(
+                        f'_request_execution_wrapper 2: {_time.perf_counter()}')
                     return_value = func(**request_body.to_kwargs())
+                    logger.warning(
+                        f'_request_execution_wrapper 3: {_time.perf_counter()}')
                 f.flush()
     except KeyboardInterrupt:
         logger.info(f'Request {request_id} cancelled by user')
@@ -557,8 +577,20 @@ def _request_execution_wrapper(request_id: str,
                      f'{common_utils.format_exception(e)}')
         return
     else:
+        import time as _time
+        _t_set = _time.perf_counter()
         api_requests.set_request_succeeded(
             request_id, return_value if not ignore_return_value else None)
+        logger.warning(
+            f'PERF set_request_succeeded: {_time.perf_counter()-_t_set:.3f}s')
+        # Write a sentinel to the log file so _tail_log_file can detect
+        # completion by reading the file rather than polling the DB.
+        from sky.utils import message_utils as _message_utils
+        from sky.utils import rich_utils as _rich_utils
+        sys.stdout.write(
+            _message_utils.encode_payload(
+                _rich_utils.Control.REQUEST_DONE.encode('')))
+        sys.stdout.flush()
         # Manually reset the original stdout and stderr file descriptors early
         # so that the "Request xxxx failed due to ..." log message will be
         # written to the original stdout and stderr file descriptors.

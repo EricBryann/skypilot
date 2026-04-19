@@ -254,8 +254,13 @@ async def _tail_log_file(
                 should_check_status = True
             if request_id is not None and should_check_status:
                 last_status_check_time = current_time
+                _t_poll = asyncio.get_event_loop().time()
                 req_status = await requests_lib.get_request_status_async(
                     request_id)
+                logger.warning(
+                    f'PERF _tail_log_file poll: '
+                    f'{asyncio.get_event_loop().time()-_t_poll:.3f}s '
+                    f'status={req_status.status}')
                 if req_status.status > requests_lib.RequestStatus.RUNNING:
                     if (req_status.status ==
                             requests_lib.RequestStatus.CANCELLED):
@@ -345,20 +350,28 @@ async def _tail_log_file(
                 lines_bytes = lines_bytes[:-1]
 
         # Process all complete lines in this chunk
+        request_done = False
         for line_bytes in lines_bytes:
             # Reconstruct line with newline (since split removed it)
             line_str = line_bytes.decode('utf-8') + '\n'
 
-            if plain_logs:
-                is_payload, line_str = message_utils.decode_payload(
-                    line_str, raise_for_mismatch=False)
-                # TODO(aylei): implement heartbeat mechanism for plain logs,
-                # sending invisible characters might be okay.
-                if is_payload:
+            is_payload, decoded = message_utils.decode_payload(
+                line_str, raise_for_mismatch=False)
+            if is_payload:
+                control, _ = rich_utils.Control.decode(decoded)
+                if control == rich_utils.Control.REQUEST_DONE:
+                    request_done = True
+                    break
+                if plain_logs:
+                    # TODO(aylei): implement heartbeat mechanism for plain
+                    # logs, sending invisible characters might be okay.
                     continue
 
             buffer.append(line_str)
             buffer_bytes += len(line_str.encode('utf-8'))
+
+        if request_done:
+            break
 
     # Flush remaining lines in the buffer.
     async for chunk in flush_buffer():

@@ -2274,7 +2274,9 @@ async def stream(
         # req.log_path is derived from request_id,
         # so it's ok to just grab the request_id in the above query.
         log_path_to_stream = request_task.log_path
-        if request_task.schedule_type == requests_lib.ScheduleType.LONG:
+        if (request_task.schedule_type == requests_lib.ScheduleType.LONG and
+                request_task.name != server_constants.REQUEST_NAME_PREFIX +
+                request_names.RequestName.CLUSTER_EXEC):
             polling_interval = stream_utils.LONG_REQUEST_POLL_INTERVAL
         del request_task
     else:

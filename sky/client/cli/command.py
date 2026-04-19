@@ -1461,6 +1461,8 @@ def exec(
       sky exec mycluster --env WANDB_API_KEY python train_gpu.py
 
     """
+    import time as _time
+    t = _time.perf_counter()
     if cluster_option is None and cluster is None:
         raise click.UsageError('Missing argument \'[CLUSTER]\' and '
                                '\'[ENTRYPOINT]...\'')
@@ -1517,10 +1519,13 @@ def exec(
     click.secho('Submitting job to cluster: ', fg='cyan', nl=False)
     click.secho(cluster)
     request_id = sdk.exec(task, cluster_name=cluster)
+    print(f'AFTER REQUEST_ID: {_time.perf_counter() - t}')
     job_id_handle = _async_call_or_wait(request_id, async_call, 'sky.exec')
+    print(f'AFTER JOB ID: {_time.perf_counter() - t}')
     if not async_call and not detach_run:
         job_id, _ = job_id_handle
         returncode = sdk.tail_logs(cluster, job_id, follow=True)
+        print(f'FINISH: {_time.perf_counter() - t}')
         sys.exit(returncode)
 
 
