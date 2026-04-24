@@ -6361,7 +6361,7 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
 
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
 
-        if os.environ.get(constants.SKYPILOT_FAST_EXEC_ENV_VAR) == '1':
+        if os.environ.get(constants.SKYPILOT_NO_RAY_EXECUTION_ENV_VAR) == '1':
             go_codegen = self._build_go_config(
                 handle, task, job_id, log_dir, internal_ips, 1,
                 task_env_vars)
@@ -6420,7 +6420,7 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         num_actual_nodes = task.num_nodes * handle.num_ips_per_node
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
 
-        if os.environ.get(constants.SKYPILOT_FAST_EXEC_ENV_VAR) == '1':
+        if os.environ.get(constants.SKYPILOT_NO_RAY_EXECUTION_ENV_VAR) == '1':
             go_codegen = self._build_go_config(
                 handle, task, job_id, log_dir, internal_ips, num_actual_nodes,
                 task_env_vars)
