@@ -546,6 +546,76 @@ def start_skylet_on_head_node(
                            f'===== stderr ====={stderr}')
 
 
+def deploy_go_executors(cluster_info: common.ClusterInfo,
+                        ssh_credentials: Dict[str, Any]) -> None:
+    """Rsync sky-exec (head) and sky-agent (all nodes), then start sky-agent.
+
+    If a binary is not found locally the step is skipped with a warning and
+    the Python/Ray path is used as fallback.
+    """
+    import sky  # pylint: disable=import-outside-toplevel
+
+    bin_dir = os.path.join(
+        os.path.dirname(sky.__file__), 'skylet', 'executor', 'bin')
+
+    runners = provision.get_command_runners(cluster_info.provider_name,
+                                            cluster_info, **ssh_credentials)
+    log_path = str(provision_logging.get_log_path())
+
+    def _run(runner: command_runner.CommandRunner, cmd: str) -> None:
+        rc, _, stderr = runner.run(cmd,
+                                   stream_logs=False,
+                                   require_outputs=True,
+                                   log_path=log_path)
+        if rc:
+            raise RuntimeError(f'Command failed (rc={rc}): {cmd}\n{stderr}')
+
+    def _deploy_node(runner: command_runner.CommandRunner,
+                     is_head: bool) -> None:
+        remote_bin_dir = constants.SKY_REMOTE_BIN_DIR
+        _run(runner, f'mkdir -p {remote_bin_dir}')
+
+        # sky-agent runs on every node.
+        agent_local = os.path.join(bin_dir, 'sky-agent')
+        if not os.path.exists(agent_local):
+            logger.warning(f'sky-agent binary not found at {agent_local}; '
+                           'skipping Go executor deployment for this node.')
+            return
+        runner.rsync_setup(source=agent_local,
+                           target=f'{remote_bin_dir}/sky-agent',
+                           up=True,
+                           stream_logs=False,
+                           log_path=log_path)
+        _run(runner, f'chmod +x {constants.SKY_AGENT_BIN}')
+        # Start sky-agent in the background; idempotent via pkill+restart.
+        _run(runner,
+             f'pkill -f {constants.SKY_AGENT_BIN} 2>/dev/null || true; '
+             f'nohup {constants.SKY_AGENT_BIN} '
+             f'> ~/.sky/sky-agent.log 2>&1 & '
+             f'echo "sky-agent started with PID $!"')
+
+        if is_head:
+            exec_local = os.path.join(bin_dir, 'sky-exec')
+            if not os.path.exists(exec_local):
+                logger.warning(
+                    f'sky-exec binary not found at {exec_local}; '
+                    'skipping sky-exec deployment.')
+                return
+            runner.rsync_setup(source=exec_local,
+                               target=f'{remote_bin_dir}/sky-exec',
+                               up=True,
+                               stream_logs=False,
+                               log_path=log_path)
+            _run(runner, f'chmod +x {constants.SKY_EXEC_BIN}')
+
+    def _deploy_worker(runner: command_runner.CommandRunner) -> None:
+        _deploy_node(runner, is_head=False)
+
+    _deploy_node(runners[0], is_head=True)
+    if len(runners) > 1:
+        subprocess_utils.run_in_parallel(_deploy_worker, runners[1:])
+
+
 @_auto_retry()
 def _internal_file_mounts(file_mounts: Dict,
                           runner: command_runner.CommandRunner,

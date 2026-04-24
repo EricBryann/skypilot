@@ -728,6 +728,7 @@ def _post_provision_setup(
         instance_setup.start_skylet_on_head_node(cluster_name, cluster_info,
                                                  ssh_credentials,
                                                  launched_resources)
+        instance_setup.deploy_go_executors(cluster_info, ssh_credentials)
 
     logger.info(
         ux_utils.finishing_message(f'Cluster launched: {cluster_name}.',
