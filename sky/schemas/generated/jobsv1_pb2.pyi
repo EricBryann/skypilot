@@ -53,26 +53,18 @@ class AddJobResponse(_message.Message):
     def __init__(self, job_id: _Optional[int] = ..., log_dir: _Optional[str] = ...) -> None: ...
 
 class QueueJobRequest(_message.Message):
-    __slots__ = ("job_id", "codegen", "script_path", "remote_log_dir", "managed_job", "node_ips", "node_scripts", "node_log_paths", "num_nodes")
+    __slots__ = ("job_id", "codegen", "script_path", "remote_log_dir", "managed_job")
     JOB_ID_FIELD_NUMBER: _ClassVar[int]
     CODEGEN_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PATH_FIELD_NUMBER: _ClassVar[int]
     REMOTE_LOG_DIR_FIELD_NUMBER: _ClassVar[int]
     MANAGED_JOB_FIELD_NUMBER: _ClassVar[int]
-    NODE_IPS_FIELD_NUMBER: _ClassVar[int]
-    NODE_SCRIPTS_FIELD_NUMBER: _ClassVar[int]
-    NODE_LOG_PATHS_FIELD_NUMBER: _ClassVar[int]
-    NUM_NODES_FIELD_NUMBER: _ClassVar[int]
     job_id: int
     codegen: str
     script_path: str
     remote_log_dir: str
     managed_job: ManagedJobInfo
-    node_ips: _containers.RepeatedScalarFieldContainer[str]
-    node_scripts: _containers.RepeatedScalarFieldContainer[str]
-    node_log_paths: _containers.RepeatedScalarFieldContainer[str]
-    num_nodes: int
-    def __init__(self, job_id: _Optional[int] = ..., codegen: _Optional[str] = ..., script_path: _Optional[str] = ..., remote_log_dir: _Optional[str] = ..., managed_job: _Optional[_Union[ManagedJobInfo, _Mapping]] = ..., node_ips: _Optional[_Iterable[str]] = ..., node_scripts: _Optional[_Iterable[str]] = ..., node_log_paths: _Optional[_Iterable[str]] = ..., num_nodes: _Optional[int] = ...) -> None: ...
+    def __init__(self, job_id: _Optional[int] = ..., codegen: _Optional[str] = ..., script_path: _Optional[str] = ..., remote_log_dir: _Optional[str] = ..., managed_job: _Optional[_Union[ManagedJobInfo, _Mapping]] = ...) -> None: ...
 
 class ManagedJobInfo(_message.Message):
     __slots__ = ("name", "pool", "workspace", "entrypoint", "tasks", "user_id", "execution")

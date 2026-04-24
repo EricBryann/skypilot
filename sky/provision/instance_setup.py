@@ -550,10 +550,8 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
                         ssh_credentials: Dict[str, Any]) -> None:
     """Rsync sky-exec (head) and sky-agent (all nodes), then start sky-agent.
 
-    Binaries are selected by the remote node's architecture so we ship the
-    right linux/{amd64,arm64} build.  If a binary for the detected arch is
-    not found locally, the step is skipped with a warning (Python/Ray path
-    will be used as fallback).
+    If a binary is not found locally the step is skipped with a warning and
+    the Python/Ray path is used as fallback.
     """
     import sky  # pylint: disable=import-outside-toplevel
 
@@ -563,13 +561,6 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
     runners = provision.get_command_runners(cluster_info.provider_name,
                                             cluster_info, **ssh_credentials)
     log_path = str(provision_logging.get_log_path())
-
-    def _remote_arch(runner: command_runner.CommandRunner) -> str:
-        _, stdout, _ = runner.run('uname -m',
-                                  stream_logs=False,
-                                  require_outputs=True)
-        m = stdout.strip()
-        return 'arm64' if m in ('arm64', 'aarch64') else 'amd64'
 
     def _run(runner: command_runner.CommandRunner, cmd: str) -> None:
         rc, _, stderr = runner.run(cmd,
@@ -581,12 +572,11 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
 
     def _deploy_node(runner: command_runner.CommandRunner,
                      is_head: bool) -> None:
-        arch = _remote_arch(runner)
         remote_bin_dir = constants.SKY_REMOTE_BIN_DIR
         _run(runner, f'mkdir -p {remote_bin_dir}')
 
         # sky-agent runs on every node.
-        agent_local = os.path.join(bin_dir, f'sky-agent-linux-{arch}')
+        agent_local = os.path.join(bin_dir, 'sky-agent')
         if not os.path.exists(agent_local):
             logger.warning(f'sky-agent binary not found at {agent_local}; '
                            'skipping Go executor deployment for this node.')
@@ -605,7 +595,7 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
              f'echo "sky-agent started with PID $!"')
 
         if is_head:
-            exec_local = os.path.join(bin_dir, f'sky-exec-linux-{arch}')
+            exec_local = os.path.join(bin_dir, 'sky-exec')
             if not os.path.exists(exec_local):
                 logger.warning(
                     f'sky-exec binary not found at {exec_local}; '

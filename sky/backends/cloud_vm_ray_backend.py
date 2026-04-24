@@ -6315,16 +6315,14 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         if task.run is None:
             return None
 
-        unset_ray_env_vars = ' && '.join(
-            [f'unset {v}' for v in task_codegen.UNSET_RAY_ENV_VARS])
-
         # Build one shared script. SKYPILOT_NODE_IPS, SKYPILOT_NUM_NODES, and
         # SKYPILOT_NODE_RANK are intentionally omitted — sky-exec injects them
         # per node at dispatch time using all_node_ips and num_nodes.
+        # RAY_RAYLET_PID does not need unsetting: sky-agent runs independently
+        # of Ray and its bash environment won't have it set.
         sky_env_vars = dict(task_env_vars)
         sky_env_vars['SKYPILOT_INTERNAL_JOB_ID'] = str(job_id)
-        task_bash = task_codegen.TaskCodeGen.build_task_bash_script(
-            task.run, env_prefix=unset_ray_env_vars)
+        task_bash = task_codegen.TaskCodeGen.build_task_bash_script(task.run)
         script = log_lib.make_task_bash_script(task_bash, env_vars=sky_env_vars)
 
         config = {

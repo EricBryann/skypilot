@@ -7,9 +7,8 @@ SKYLET_GEN_DIR := gen/skylet
 BIN_DIR := ../bin
 
 TARGETS := sky-exec sky-agent
-ARCHS   := linux/amd64 linux/arm64
 
-.PHONY: all proto constants deps build cross clean
+.PHONY: all proto constants deps build clean
 
 all: constants proto deps build
 
@@ -56,20 +55,6 @@ build: proto deps
 	)
 	@echo "Built: $(addprefix $(BIN_DIR)/,$(TARGETS))"
 
-# --- cross-compile for all target arches -------------------------------------
-cross: proto deps
-	@mkdir -p $(BIN_DIR)
-	$(foreach pair,$(ARCHS), \
-		$(eval OS   := $(word 1,$(subst /, ,$(pair)))) \
-		$(eval ARCH := $(word 2,$(subst /, ,$(pair)))) \
-		$(foreach t,$(TARGETS), \
-			GOOS=$(OS) GOARCH=$(ARCH) go build \
-				-o $(BIN_DIR)/$(t)-$(OS)-$(ARCH) \
-				./cmd/$(t); \
-		) \
-	)
-	@echo "Cross-compiled binaries in $(BIN_DIR)/"
-	@ls -lh $(BIN_DIR)/
 
 clean:
-	rm -rf $(GEN_DIR) $(BIN_DIR)/sky-exec* $(BIN_DIR)/sky-agent*
+	rm -rf $(GEN_DIR) $(BIN_DIR)/sky-exec $(BIN_DIR)/sky-agent
