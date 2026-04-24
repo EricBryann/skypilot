@@ -2,7 +2,8 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -52,18 +53,20 @@ class AddJobResponse(_message.Message):
     def __init__(self, job_id: _Optional[int] = ..., log_dir: _Optional[str] = ...) -> None: ...
 
 class QueueJobRequest(_message.Message):
-    __slots__ = ("job_id", "codegen", "script_path", "remote_log_dir", "managed_job")
+    __slots__ = ("job_id", "codegen", "script_path", "remote_log_dir", "managed_job", "use_go_executor")
     JOB_ID_FIELD_NUMBER: _ClassVar[int]
     CODEGEN_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PATH_FIELD_NUMBER: _ClassVar[int]
     REMOTE_LOG_DIR_FIELD_NUMBER: _ClassVar[int]
     MANAGED_JOB_FIELD_NUMBER: _ClassVar[int]
+    USE_GO_EXECUTOR_FIELD_NUMBER: _ClassVar[int]
     job_id: int
     codegen: str
     script_path: str
     remote_log_dir: str
     managed_job: ManagedJobInfo
-    def __init__(self, job_id: _Optional[int] = ..., codegen: _Optional[str] = ..., script_path: _Optional[str] = ..., remote_log_dir: _Optional[str] = ..., managed_job: _Optional[_Union[ManagedJobInfo, _Mapping]] = ...) -> None: ...
+    use_go_executor: bool
+    def __init__(self, job_id: _Optional[int] = ..., codegen: _Optional[str] = ..., script_path: _Optional[str] = ..., remote_log_dir: _Optional[str] = ..., managed_job: _Optional[_Union[ManagedJobInfo, _Mapping]] = ..., use_go_executor: bool = ...) -> None: ...
 
 class ManagedJobInfo(_message.Message):
     __slots__ = ("name", "pool", "workspace", "entrypoint", "tasks", "user_id", "execution")
@@ -304,3 +307,11 @@ class SetJobInfoWithoutJobIdResponse(_message.Message):
     JOB_IDS_FIELD_NUMBER: _ClassVar[int]
     job_ids: _containers.RepeatedScalarFieldContainer[int]
     def __init__(self, job_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class ScheduleStepRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ScheduleStepResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

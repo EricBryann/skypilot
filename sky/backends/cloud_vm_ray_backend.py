@@ -3872,6 +3872,7 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         managed_job_dag: Optional['dag.Dag'] = None,
         managed_job_user_id: Optional[str] = None,
         remote_log_dir: Optional[str] = None,
+        use_go_executor: bool = False,
     ) -> None:
         """Executes generated code on the head node."""
         use_legacy = not handle.is_grpc_enabled_with_flag
@@ -3979,14 +3980,16 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
                         # codegen not set - server assumes script uploaded
                         remote_log_dir=remote_log_dir,
                         managed_job=managed_job_info,
-                        script_path=script_path)
+                        script_path=script_path,
+                        use_go_executor=use_go_executor)
                 else:
                     queue_job_request = jobsv1_pb2.QueueJobRequest(
                         job_id=job_id,
                         codegen=codegen,
                         remote_log_dir=remote_log_dir,
                         managed_job=managed_job_info,
-                        script_path=script_path)
+                        script_path=script_path,
+                        use_go_executor=use_go_executor)
 
                 backend_utils.invoke_skylet_with_retries(lambda: SkyletClient(
                     handle.get_grpc_channel()).queue_job(queue_job_request))
@@ -6277,10 +6280,46 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         else:
             return task_codegen.RayCodeGen()
 
+    def _build_go_config(
+        self,
+        handle: CloudVmRayResourceHandle,
+        task: task_lib.Task,
+        job_id: int,
+        log_dir: str,
+        internal_ips: List[str],
+        num_actual_nodes: int,
+        task_env_vars: Dict[str, str],
+    ) -> Optional[str]:
+        """Return a JSON config string for sky-exec, or None to fall
+        back to the Python/Ray path (Slurm or no run command)."""
+        if isinstance(handle.launched_resources.cloud, clouds.Slurm):
+            return None
+        if task.run is None:
+            return None
+
+        # Build one shared script. SKYPILOT_NODE_IPS, SKYPILOT_NUM_NODES, and
+        # SKYPILOT_NODE_RANK are intentionally omitted — sky-exec injects them
+        # per node at dispatch time using all_node_ips and num_nodes.
+        # RAY_RAYLET_PID does not need unsetting: sky-agent runs independently
+        # of Ray and its bash environment won't have it set.
+        sky_env_vars = dict(task_env_vars)
+        sky_env_vars['SKYPILOT_INTERNAL_JOB_ID'] = str(job_id)
+        task_bash = task_codegen.TaskCodeGen.build_task_bash_script(task.run)
+        script = log_lib.make_task_bash_script(task_bash, env_vars=sky_env_vars)
+
+        config = {
+            'job_id': job_id,
+            'all_node_ips': internal_ips,
+            'num_nodes': num_actual_nodes,
+            'num_gpus_per_node': self._get_num_gpus(task),
+            'script': script,
+            'log_dir': log_dir,
+        }
+        return json.dumps(config)
+
     def _execute_task_one_node(self, handle: CloudVmRayResourceHandle,
                                task: task_lib.Task, job_id: int,
                                remote_log_dir: str) -> None:
-        # Launch the command as a Ray task.
         log_dir = os.path.join(remote_log_dir, 'tasks')
 
         resources_dict = backend_utils.get_task_demands_dict(task)
@@ -6288,6 +6327,20 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         assert internal_ips is not None, 'internal_ips is not cached in handle'
 
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
+
+        if os.environ.get(constants.SKYPILOT_NO_RAY_EXECUTION_ENV_VAR) == '1':
+            go_codegen = self._build_go_config(
+                handle, task, job_id, log_dir, internal_ips, 1,
+                task_env_vars)
+            if go_codegen is not None:
+                self._exec_code_on_head(handle,
+                                        go_codegen,
+                                        job_id,
+                                        managed_job_dag=task.managed_job_dag,
+                                        managed_job_user_id=self._get_managed_job_user_id(task),
+                                        remote_log_dir=remote_log_dir,
+                                        use_go_executor=True)
+                return
 
         codegen = self._get_task_codegen_class(handle)
 
@@ -6334,6 +6387,20 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         # If TPU VM Pods is used, #num_nodes should be num_nodes * num_node_ips
         num_actual_nodes = task.num_nodes * handle.num_ips_per_node
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
+
+        if os.environ.get(constants.SKYPILOT_NO_RAY_EXECUTION_ENV_VAR) == '1':
+            go_codegen = self._build_go_config(
+                handle, task, job_id, log_dir, internal_ips, num_actual_nodes,
+                task_env_vars)
+            if go_codegen is not None:
+                self._exec_code_on_head(handle,
+                                        go_codegen,
+                                        job_id,
+                                        managed_job_dag=task.managed_job_dag,
+                                        managed_job_user_id=self._get_managed_job_user_id(task),
+                                        remote_log_dir=remote_log_dir,
+                                        use_go_executor=True)
+                return
 
         codegen = self._get_task_codegen_class(handle)
 

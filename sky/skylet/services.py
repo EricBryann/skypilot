@@ -202,14 +202,19 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
                     f.write(request.codegen)
                 os.chmod(script_path, 0o755)
 
-            job_submit_cmd = (
-                # JOB_CMD_IDENTIFIER is used for identifying the process
-                # retrieved with pid is the same driver process.
-                f'{job_lib.JOB_CMD_IDENTIFIER.format(job_id)} && '
-                f'{constants.SKY_PYTHON_CMD} -u {script_path}'
-                # Do not use &>, which is not POSIX and may not work.
-                # Note that the order of ">filename 2>&1" matters.
-                f' > {remote_log_path} 2>&1')
+            if request.use_go_executor:
+                job_submit_cmd = (f'{job_lib.JOB_CMD_IDENTIFIER.format(job_id)} && '
+                    f'{constants.SKY_EXEC_BIN} < {script_path}'
+                    f' > {remote_log_path} 2>&1')
+            else:
+                job_submit_cmd = (
+                    # JOB_CMD_IDENTIFIER is used for identifying the process
+                    # retrieved with pid is the same driver process.
+                    f'{job_lib.JOB_CMD_IDENTIFIER.format(job_id)} && '
+                    f'{constants.SKY_PYTHON_CMD} -u {script_path}'
+                    # Do not use &>, which is not POSIX and may not work.
+                    # Note that the order of ">filename 2>&1" matters.
+                    f' > {remote_log_path} 2>&1')
             job_lib.scheduler.queue(job_id, job_submit_cmd)
             return jobsv1_pb2.QueueJobResponse()
         except Exception as e:  # pylint: disable=broad-except
@@ -412,6 +417,16 @@ class JobsServiceImpl(jobsv1_pb2_grpc.JobsServiceServicer):
                 exit_codes_list = job_lib.get_exit_codes(job_id)
                 exit_codes = exit_codes_list if exit_codes_list else []
             return jobsv1_pb2.GetJobExitCodesResponse(exit_codes=exit_codes)
+        except Exception as e:  # pylint: disable=broad-except
+            context.abort(grpc.StatusCode.INTERNAL, str(e))
+
+    def ScheduleStep(  # type: ignore[return]
+            self, request: jobsv1_pb2.ScheduleStepRequest,
+            context: grpc.ServicerContext
+    ) -> jobsv1_pb2.ScheduleStepResponse:
+        try:
+            job_lib.scheduler.schedule_step()
+            return jobsv1_pb2.ScheduleStepResponse()
         except Exception as e:  # pylint: disable=broad-except
             context.abort(grpc.StatusCode.INTERNAL, str(e))
 

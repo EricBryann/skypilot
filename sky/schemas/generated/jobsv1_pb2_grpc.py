@@ -3,12 +3,10 @@
 import grpc
 import warnings
 
-from sky.schemas.generated import jobsv1_pb2 as sky_dot_schemas_dot_generated_dot_jobsv1__pb2
+from sky.schemas.generated import jobsv1_pb2 as jobsv1__pb2
 
-GRPC_GENERATED_VERSION = '1.63.0'
+GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
-EXPECTED_ERROR_RELEASE = '1.65.0'
-SCHEDULED_RELEASE_DATE = 'June 25, 2024'
 _version_not_supported = False
 
 try:
@@ -18,15 +16,12 @@ except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
-    warnings.warn(
+    raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in sky/schemas/generated/jobsv1_pb2_grpc.py depends on'
+        + f' but the generated code in jobsv1_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
-        + f' This warning will become an error in {EXPECTED_ERROR_RELEASE},'
-        + f' scheduled for release on {SCHEDULED_RELEASE_DATE}.',
-        RuntimeWarning
     )
 
 
@@ -41,68 +36,73 @@ class JobsServiceStub(object):
         """
         self.AddJob = channel.unary_unary(
                 '/jobs.v1.JobsService/AddJob',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobResponse.FromString,
+                request_serializer=jobsv1__pb2.AddJobRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.AddJobResponse.FromString,
                 _registered_method=True)
         self.QueueJob = channel.unary_unary(
                 '/jobs.v1.JobsService/QueueJob',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobResponse.FromString,
+                request_serializer=jobsv1__pb2.QueueJobRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.QueueJobResponse.FromString,
                 _registered_method=True)
         self.UpdateStatus = channel.unary_unary(
                 '/jobs.v1.JobsService/UpdateStatus',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusResponse.FromString,
+                request_serializer=jobsv1__pb2.UpdateStatusRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.UpdateStatusResponse.FromString,
                 _registered_method=True)
         self.GetJobQueue = channel.unary_unary(
                 '/jobs.v1.JobsService/GetJobQueue',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueResponse.FromString,
+                request_serializer=jobsv1__pb2.GetJobQueueRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetJobQueueResponse.FromString,
                 _registered_method=True)
         self.CancelJobs = channel.unary_unary(
                 '/jobs.v1.JobsService/CancelJobs',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsResponse.FromString,
+                request_serializer=jobsv1__pb2.CancelJobsRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.CancelJobsResponse.FromString,
                 _registered_method=True)
         self.FailAllInProgressJobs = channel.unary_unary(
                 '/jobs.v1.JobsService/FailAllInProgressJobs',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsResponse.FromString,
+                request_serializer=jobsv1__pb2.FailAllInProgressJobsRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.FailAllInProgressJobsResponse.FromString,
                 _registered_method=True)
         self.TailLogs = channel.unary_stream(
                 '/jobs.v1.JobsService/TailLogs',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsResponse.FromString,
+                request_serializer=jobsv1__pb2.TailLogsRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.TailLogsResponse.FromString,
                 _registered_method=True)
         self.GetJobStatus = channel.unary_unary(
                 '/jobs.v1.JobsService/GetJobStatus',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusResponse.FromString,
+                request_serializer=jobsv1__pb2.GetJobStatusRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetJobStatusResponse.FromString,
                 _registered_method=True)
         self.GetJobSubmittedTimestamp = channel.unary_unary(
                 '/jobs.v1.JobsService/GetJobSubmittedTimestamp',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampResponse.FromString,
+                request_serializer=jobsv1__pb2.GetJobSubmittedTimestampRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetJobSubmittedTimestampResponse.FromString,
                 _registered_method=True)
         self.GetJobEndedTimestamp = channel.unary_unary(
                 '/jobs.v1.JobsService/GetJobEndedTimestamp',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampResponse.FromString,
+                request_serializer=jobsv1__pb2.GetJobEndedTimestampRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetJobEndedTimestampResponse.FromString,
                 _registered_method=True)
         self.GetLogDirsForJobs = channel.unary_unary(
                 '/jobs.v1.JobsService/GetLogDirsForJobs',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsResponse.FromString,
+                request_serializer=jobsv1__pb2.GetLogDirsForJobsRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetLogDirsForJobsResponse.FromString,
                 _registered_method=True)
         self.GetJobExitCodes = channel.unary_unary(
                 '/jobs.v1.JobsService/GetJobExitCodes',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesResponse.FromString,
+                request_serializer=jobsv1__pb2.GetJobExitCodesRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.GetJobExitCodesResponse.FromString,
                 _registered_method=True)
         self.SetJobInfoWithoutJobId = channel.unary_unary(
                 '/jobs.v1.JobsService/SetJobInfoWithoutJobId',
-                request_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdRequest.SerializeToString,
-                response_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdResponse.FromString,
+                request_serializer=jobsv1__pb2.SetJobInfoWithoutJobIdRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.SetJobInfoWithoutJobIdResponse.FromString,
+                _registered_method=True)
+        self.ScheduleStep = channel.unary_unary(
+                '/jobs.v1.JobsService/ScheduleStep',
+                request_serializer=jobsv1__pb2.ScheduleStepRequest.SerializeToString,
+                response_deserializer=jobsv1__pb2.ScheduleStepResponse.FromString,
                 _registered_method=True)
 
 
@@ -200,78 +200,91 @@ class JobsServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ScheduleStep(self, request, context):
+        """Trigger the job scheduler to immediately pick up the next pending job.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_JobsServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'AddJob': grpc.unary_unary_rpc_method_handler(
                     servicer.AddJob,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.AddJobRequest.FromString,
+                    response_serializer=jobsv1__pb2.AddJobResponse.SerializeToString,
             ),
             'QueueJob': grpc.unary_unary_rpc_method_handler(
                     servicer.QueueJob,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.QueueJobRequest.FromString,
+                    response_serializer=jobsv1__pb2.QueueJobResponse.SerializeToString,
             ),
             'UpdateStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateStatus,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.UpdateStatusRequest.FromString,
+                    response_serializer=jobsv1__pb2.UpdateStatusResponse.SerializeToString,
             ),
             'GetJobQueue': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJobQueue,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetJobQueueRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetJobQueueResponse.SerializeToString,
             ),
             'CancelJobs': grpc.unary_unary_rpc_method_handler(
                     servicer.CancelJobs,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.CancelJobsRequest.FromString,
+                    response_serializer=jobsv1__pb2.CancelJobsResponse.SerializeToString,
             ),
             'FailAllInProgressJobs': grpc.unary_unary_rpc_method_handler(
                     servicer.FailAllInProgressJobs,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.FailAllInProgressJobsRequest.FromString,
+                    response_serializer=jobsv1__pb2.FailAllInProgressJobsResponse.SerializeToString,
             ),
             'TailLogs': grpc.unary_stream_rpc_method_handler(
                     servicer.TailLogs,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.TailLogsRequest.FromString,
+                    response_serializer=jobsv1__pb2.TailLogsResponse.SerializeToString,
             ),
             'GetJobStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJobStatus,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetJobStatusRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetJobStatusResponse.SerializeToString,
             ),
             'GetJobSubmittedTimestamp': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJobSubmittedTimestamp,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetJobSubmittedTimestampRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetJobSubmittedTimestampResponse.SerializeToString,
             ),
             'GetJobEndedTimestamp': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJobEndedTimestamp,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetJobEndedTimestampRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetJobEndedTimestampResponse.SerializeToString,
             ),
             'GetLogDirsForJobs': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLogDirsForJobs,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetLogDirsForJobsRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetLogDirsForJobsResponse.SerializeToString,
             ),
             'GetJobExitCodes': grpc.unary_unary_rpc_method_handler(
                     servicer.GetJobExitCodes,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.GetJobExitCodesRequest.FromString,
+                    response_serializer=jobsv1__pb2.GetJobExitCodesResponse.SerializeToString,
             ),
             'SetJobInfoWithoutJobId': grpc.unary_unary_rpc_method_handler(
                     servicer.SetJobInfoWithoutJobId,
-                    request_deserializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdRequest.FromString,
-                    response_serializer=sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdResponse.SerializeToString,
+                    request_deserializer=jobsv1__pb2.SetJobInfoWithoutJobIdRequest.FromString,
+                    response_serializer=jobsv1__pb2.SetJobInfoWithoutJobIdResponse.SerializeToString,
+            ),
+            'ScheduleStep': grpc.unary_unary_rpc_method_handler(
+                    servicer.ScheduleStep,
+                    request_deserializer=jobsv1__pb2.ScheduleStepRequest.FromString,
+                    response_serializer=jobsv1__pb2.ScheduleStepResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'jobs.v1.JobsService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('jobs.v1.JobsService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -293,8 +306,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/AddJob',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.AddJobResponse.FromString,
+            jobsv1__pb2.AddJobRequest.SerializeToString,
+            jobsv1__pb2.AddJobResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -320,8 +333,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/QueueJob',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.QueueJobResponse.FromString,
+            jobsv1__pb2.QueueJobRequest.SerializeToString,
+            jobsv1__pb2.QueueJobResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -347,8 +360,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/UpdateStatus',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.UpdateStatusResponse.FromString,
+            jobsv1__pb2.UpdateStatusRequest.SerializeToString,
+            jobsv1__pb2.UpdateStatusResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -374,8 +387,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetJobQueue',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobQueueResponse.FromString,
+            jobsv1__pb2.GetJobQueueRequest.SerializeToString,
+            jobsv1__pb2.GetJobQueueResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -401,8 +414,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/CancelJobs',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.CancelJobsResponse.FromString,
+            jobsv1__pb2.CancelJobsRequest.SerializeToString,
+            jobsv1__pb2.CancelJobsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -428,8 +441,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/FailAllInProgressJobs',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.FailAllInProgressJobsResponse.FromString,
+            jobsv1__pb2.FailAllInProgressJobsRequest.SerializeToString,
+            jobsv1__pb2.FailAllInProgressJobsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -455,8 +468,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/TailLogs',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.TailLogsResponse.FromString,
+            jobsv1__pb2.TailLogsRequest.SerializeToString,
+            jobsv1__pb2.TailLogsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -482,8 +495,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetJobStatus',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobStatusResponse.FromString,
+            jobsv1__pb2.GetJobStatusRequest.SerializeToString,
+            jobsv1__pb2.GetJobStatusResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -509,8 +522,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetJobSubmittedTimestamp',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobSubmittedTimestampResponse.FromString,
+            jobsv1__pb2.GetJobSubmittedTimestampRequest.SerializeToString,
+            jobsv1__pb2.GetJobSubmittedTimestampResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -536,8 +549,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetJobEndedTimestamp',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobEndedTimestampResponse.FromString,
+            jobsv1__pb2.GetJobEndedTimestampRequest.SerializeToString,
+            jobsv1__pb2.GetJobEndedTimestampResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -563,8 +576,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetLogDirsForJobs',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetLogDirsForJobsResponse.FromString,
+            jobsv1__pb2.GetLogDirsForJobsRequest.SerializeToString,
+            jobsv1__pb2.GetLogDirsForJobsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -590,8 +603,8 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/GetJobExitCodes',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.GetJobExitCodesResponse.FromString,
+            jobsv1__pb2.GetJobExitCodesRequest.SerializeToString,
+            jobsv1__pb2.GetJobExitCodesResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -617,8 +630,35 @@ class JobsService(object):
             request,
             target,
             '/jobs.v1.JobsService/SetJobInfoWithoutJobId',
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdRequest.SerializeToString,
-            sky_dot_schemas_dot_generated_dot_jobsv1__pb2.SetJobInfoWithoutJobIdResponse.FromString,
+            jobsv1__pb2.SetJobInfoWithoutJobIdRequest.SerializeToString,
+            jobsv1__pb2.SetJobInfoWithoutJobIdResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ScheduleStep(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jobs.v1.JobsService/ScheduleStep',
+            jobsv1__pb2.ScheduleStepRequest.SerializeToString,
+            jobsv1__pb2.ScheduleStepResponse.FromString,
             options,
             channel_credentials,
             insecure,

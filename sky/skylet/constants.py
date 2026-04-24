@@ -20,6 +20,8 @@ SKY_RUNTIME_DIR = '${SKY_RUNTIME_DIR:-$HOME}'
 #    os.path.expanduser(os.environ.get(SKY_RUNTIME_DIR_ENV_VAR_KEY, '~')),
 #    '.sky/jobs.db')
 SKY_RUNTIME_DIR_ENV_VAR_KEY = 'SKY_RUNTIME_DIR'
+# When set to '1', skips Ray and uses the Go gRPC execution path instead.
+SKYPILOT_NO_RAY_EXECUTION_ENV_VAR = 'SKYPILOT_NO_RAY_EXECUTION'
 SKY_CLUSTER_NAME_ENV_VAR_KEY = 'SKY_CLUSTER_NAME'
 # We keep sky_logs and sky_workdir in $HOME, because
 # these are artifacts that users can access, and having
