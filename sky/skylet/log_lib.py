@@ -369,7 +369,7 @@ def make_task_bash_script(codegen: str,
             #!/bin/bash
             source ~/.bashrc
             set -a
-            . $(conda info --base 2> /dev/null)/etc/profile.d/conda.sh > /dev/null 2>&1 || true
+            . "${{CONDA_EXE%/bin/conda}}/etc/profile.d/conda.sh" > /dev/null 2>&1 || . "$(conda info --base 2>/dev/null)/etc/profile.d/conda.sh" > /dev/null 2>&1 || true
             set +a
             {constants.DEACTIVATE_SKY_REMOTE_PYTHON_ENV}
             export PYTHONUNBUFFERED=1
