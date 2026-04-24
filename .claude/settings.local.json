@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod *)",
+      "Bash(go install *)",
+      "Bash(make proto *)",
+      "Bash(kubectl --context kind-skypilot -n default exec my-cluster-fee93ed3-head -- bash -c ' *)",
+      "Bash(kubectl --context kind-skypilot -n default exec my-cluster-fee93ed3-head -- bash -c \"nc -z localhost 46590 && echo UP\")",
+      "Bash(kubectl *)"
+    ]
+  }
+}

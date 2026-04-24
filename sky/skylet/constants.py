@@ -20,6 +20,9 @@ SKY_RUNTIME_DIR = '${SKY_RUNTIME_DIR:-$HOME}'
 #    os.path.expanduser(os.environ.get(SKY_RUNTIME_DIR_ENV_VAR_KEY, '~')),
 #    '.sky/jobs.db')
 SKY_RUNTIME_DIR_ENV_VAR_KEY = 'SKY_RUNTIME_DIR'
+# When set to '1', skips source ~/.bashrc and conda init in the task script
+# preamble. Useful for the Go gRPC execution path where startup latency matters.
+SKYPILOT_FAST_EXEC_ENV_VAR = 'SKYPILOT_FAST_EXEC'
 SKY_CLUSTER_NAME_ENV_VAR_KEY = 'SKY_CLUSTER_NAME'
 # We keep sky_logs and sky_workdir in $HOME, because
 # these are artifacts that users can access, and having
@@ -73,6 +76,8 @@ SKY_GET_PYTHON_PATH_CMD = (f'[ -s {SKY_PYTHON_PATH_FILE} ] && '
 # Python executable, e.g., /opt/conda/bin/python3
 SKY_PYTHON_CMD = (f'{SKY_UNSET_PYTHONPATH_AND_SET_CWD} '
                   f'$({SKY_GET_PYTHON_PATH_CMD})')
+# Go executor binary deployed to the cluster during sky launch.
+SKY_EXEC_BIN = f'{SKY_RUNTIME_DIR}/.sky/bin/sky-exec'
 # Prefer SKY_UV_PIP_CMD, which is faster.
 # TODO(cooperc): remove remaining usage (GCP TPU setup).
 SKY_PIP_CMD = f'{SKY_PYTHON_CMD} -m pip'

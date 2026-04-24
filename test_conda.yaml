@@ -1,0 +1,11 @@
+run: |
+  echo "=== Python path ==="
+  which python
+  python --version
+
+  echo "=== Conda ==="
+  conda --version
+  conda info --envs
+
+  echo "=== Torch ==="
+  python -c "import torch; print('torch:', torch.__version__)"

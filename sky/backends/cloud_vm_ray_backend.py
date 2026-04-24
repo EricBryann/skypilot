@@ -2317,11 +2317,19 @@ class CloudVmRayResourceHandle(backends.backend.ResourceHandle):
         # For (2), for processes that read the "stale" tunnel, it will fail
         # and on the next retry, it will call get_grpc_channel again
         # and get the new tunnel.
+        import time as _time
+        _t0 = _time.perf_counter()
         tunnel = self._get_skylet_ssh_tunnel()
         if tunnel is not None:
             if _is_tunnel_healthy(tunnel):
+                logger.warning(
+                    f'PERF get_grpc_channel: tunnel healthy, reused in '
+                    f'{_time.perf_counter()-_t0:.3f}s')
                 return grpc.insecure_channel(f'localhost:{tunnel.port}',
                                              options=grpc_options)
+            logger.warning(
+                f'PERF get_grpc_channel: tunnel unhealthy (port '
+                f'{tunnel.port}), must re-create')
             logger.debug('Failed to connect to SSH tunnel for cluster '
                          f'{self.cluster_name!r} on port {tunnel.port}')
 
@@ -2427,13 +2435,19 @@ class CloudVmRayResourceHandle(backends.backend.ResourceHandle):
         max_attempts = 3
         # There could be a race condition here, as multiple processes may
         # attempt to open the same port at the same time.
+        import time as _time
+        _t_tunnel_start = _time.perf_counter()
         for attempt in range(max_attempts):
             runners = self.get_command_runners()
             head_runner = runners[0]
             local_port = random.randint(10000, 65535)
+            _t_ssh = _time.perf_counter()
             try:
                 ssh_tunnel_proc = backend_utils.open_ssh_tunnel(
                     head_runner, (local_port, constants.SKYLET_GRPC_PORT))
+                logger.warning(
+                    f'PERF _open_and_update_skylet_tunnel: open_ssh_tunnel '
+                    f'took {_time.perf_counter()-_t_ssh:.3f}s')
             except exceptions.CommandError as e:
                 # Don't retry if the error is due to timeout,
                 # connection refused, Kubernetes pods not found,
@@ -2454,9 +2468,16 @@ class CloudVmRayResourceHandle(backends.backend.ResourceHandle):
             break
 
         try:
+            _t_ready = _time.perf_counter()
             grpc.channel_ready_future(
                 grpc.insecure_channel(f'localhost:{tunnel_info.port}')).result(
                     timeout=constants.SKYLET_GRPC_TIMEOUT_SECONDS)
+            logger.warning(
+                f'PERF _open_and_update_skylet_tunnel: channel_ready_future '
+                f'took {_time.perf_counter()-_t_ready:.3f}s')
+            logger.warning(
+                f'PERF _open_and_update_skylet_tunnel: total tunnel creation '
+                f'took {_time.perf_counter()-_t_tunnel_start:.3f}s')
             # Clean up existing tunnel before setting up the new one.
             old_tunnel = self._get_skylet_ssh_tunnel()
             if old_tunnel is not None:
@@ -6277,10 +6298,61 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         else:
             return task_codegen.RayCodeGen()
 
+    def _build_go_config(
+        self,
+        handle: CloudVmRayResourceHandle,
+        task: task_lib.Task,
+        job_id: int,
+        log_dir: str,
+        internal_ips: List[str],
+        num_actual_nodes: int,
+        task_env_vars: Dict[str, str],
+    ) -> Optional[str]:
+        """Return a SKY_GO_EXEC codegen string for sky-exec, or None to fall
+        back to the Python/Ray path (Slurm or no run command)."""
+        if isinstance(handle.launched_resources.cloud, clouds.Slurm):
+            return None
+        if task.run is None:
+            return None
+
+        task_ips = internal_ips[:num_actual_nodes]
+        job_ip_list_str = '\n'.join(task_ips)
+        unset_ray_env_vars = ' && '.join(
+            [f'unset {v}' for v in task_codegen.UNSET_RAY_ENV_VARS])
+        node_scripts: List[str] = []
+        node_log_paths: List[str] = []
+        for rank in range(num_actual_nodes):
+            sky_env_vars = dict(task_env_vars)
+            sky_env_vars[constants.SKYPILOT_NODE_IPS] = job_ip_list_str
+            sky_env_vars[constants.SKYPILOT_NUM_NODES] = str(num_actual_nodes)
+            sky_env_vars[constants.SKYPILOT_NODE_RANK] = str(rank)
+            sky_env_vars['SKYPILOT_INTERNAL_JOB_ID'] = str(job_id)
+            task_bash = task_codegen.TaskCodeGen.build_task_bash_script(
+                task.run, env_prefix=unset_ray_env_vars)
+            node_scripts.append(
+                log_lib.make_task_bash_script(task_bash,
+                                              env_vars=sky_env_vars))
+            if num_actual_nodes == 1:
+                node_log_paths.append(os.path.join(log_dir, 'run.log'))
+            else:
+                node_name = 'head' if rank == 0 else f'worker{rank}'
+                node_log_paths.append(
+                    os.path.join(log_dir, f'{rank}-{node_name}.log'))
+
+        config = {
+            'job_id': job_id,
+            'node_ips': task_ips,
+            'node_scripts': node_scripts,
+            'node_log_paths': node_log_paths,
+            'log_dir': log_dir,
+            'agent_port': 50052,
+        }
+        from sky.skylet.services import _GO_EXEC_PREFIX  # pylint: disable=import-outside-toplevel
+        return _GO_EXEC_PREFIX + json.dumps(config)
+
     def _execute_task_one_node(self, handle: CloudVmRayResourceHandle,
                                task: task_lib.Task, job_id: int,
                                remote_log_dir: str) -> None:
-        # Launch the command as a Ray task.
         log_dir = os.path.join(remote_log_dir, 'tasks')
 
         resources_dict = backend_utils.get_task_demands_dict(task)
@@ -6288,6 +6360,19 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         assert internal_ips is not None, 'internal_ips is not cached in handle'
 
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
+
+        if os.environ.get(constants.SKYPILOT_FAST_EXEC_ENV_VAR) == '1':
+            go_codegen = self._build_go_config(
+                handle, task, job_id, log_dir, internal_ips, 1,
+                task_env_vars)
+            if go_codegen is not None:
+                self._exec_code_on_head(handle,
+                                        go_codegen,
+                                        job_id,
+                                        managed_job_dag=task.managed_job_dag,
+                                        managed_job_user_id=self._get_managed_job_user_id(task),
+                                        remote_log_dir=remote_log_dir)
+                return
 
         codegen = self._get_task_codegen_class(handle)
 
@@ -6334,6 +6419,19 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         # If TPU VM Pods is used, #num_nodes should be num_nodes * num_node_ips
         num_actual_nodes = task.num_nodes * handle.num_ips_per_node
         task_env_vars = self._get_task_env_vars(task, job_id, handle)
+
+        if os.environ.get(constants.SKYPILOT_FAST_EXEC_ENV_VAR) == '1':
+            go_codegen = self._build_go_config(
+                handle, task, job_id, log_dir, internal_ips, num_actual_nodes,
+                task_env_vars)
+            if go_codegen is not None:
+                self._exec_code_on_head(handle,
+                                        go_codegen,
+                                        job_id,
+                                        managed_job_dag=task.managed_job_dag,
+                                        managed_job_user_id=self._get_managed_job_user_id(task),
+                                        remote_log_dir=remote_log_dir)
+                return
 
         codegen = self._get_task_codegen_class(handle)
 

@@ -899,8 +899,13 @@ def exec(  # pylint: disable=redefined-builtin
 
     # Check if cluster is autostopping - reject exec on autostopping clusters
     if not dryrun:
+        import time as _time
+        _t_refresh = _time.perf_counter()
         cluster_status, _ = backend_utils.refresh_cluster_status_handle(
             cluster_name)
+        logger.warning(
+            f'PERF exec refresh_cluster_status_handle: '
+            f'{_time.perf_counter()-_t_refresh:.3f}s')
         if cluster_status == status_lib.ClusterStatus.AUTOSTOPPING:
             raise exceptions.ClusterNotUpError(
                 f'Cannot execute on cluster {cluster_name!r}: cluster is '

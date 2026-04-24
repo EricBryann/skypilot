@@ -29,6 +29,8 @@ service JobsService {
   rpc GetJobExitCodes(GetJobExitCodesRequest) returns (GetJobExitCodesResponse);
   // Set job info without creating entries in the jobs table (for managed jobs).
   rpc SetJobInfoWithoutJobId(SetJobInfoWithoutJobIdRequest) returns (SetJobInfoWithoutJobIdResponse);
+  // Trigger the job scheduler to immediately pick up the next pending job.
+  rpc ScheduleStep(ScheduleStepRequest) returns (ScheduleStepResponse);
 }
 
 enum JobStatus {
@@ -63,6 +65,12 @@ message QueueJobRequest {
   string script_path = 3;
   string remote_log_dir = 4;
   optional ManagedJobInfo managed_job = 5;
+  // Go executor fields. When node_ips is non-empty the skylet spawns sky-exec
+  // instead of a Python driver, eliminating Python cold-start entirely.
+  repeated string node_ips         = 6;
+  repeated string node_scripts     = 7;  // per-node bash script content
+  repeated string node_log_paths   = 8;  // per-node log file paths on cluster
+  int32           num_nodes        = 9;
 }
 
 message ManagedJobInfo {
@@ -202,3 +210,6 @@ message SetJobInfoWithoutJobIdRequest {
 message SetJobInfoWithoutJobIdResponse {
   repeated int64 job_ids = 1;
 }
+
+message ScheduleStepRequest {}
+message ScheduleStepResponse {}

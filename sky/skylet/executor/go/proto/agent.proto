@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "skypilot.dev/executor/gen/agent";
+
+service AgentService {
+  // Execute runs a bash script and streams output back to the caller.
+  rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);
+}
+
+message ExecuteRequest {
+  string script    = 1;  // bash script content
+  int32  job_id    = 2;
+  int32  node_rank = 3;
+}
+
+message ExecuteResponse {
+  bytes  output    = 1;  // raw stdout/stderr bytes
+  int32  exit_code = 2;  // set only when done=true
+  bool   done      = 3;
+  int32  pid       = 4;  // set only in the first response
+}

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package skylet.v1;
+
+option go_package = "skypilot.dev/executor/gen/skylet";
+
+// Minimal subset of JobsService used by sky-exec to trigger the scheduler.
+service JobsService {
+  rpc ScheduleStep(ScheduleStepRequest) returns (ScheduleStepResponse);
+}
+
+message ScheduleStepRequest {}
+message ScheduleStepResponse {}

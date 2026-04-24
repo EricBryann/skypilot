@@ -369,7 +369,7 @@ def make_task_bash_script(codegen: str,
             #!/bin/bash
             source ~/.bashrc
             set -a
-            . $(conda info --base 2> /dev/null)/etc/profile.d/conda.sh > /dev/null 2>&1 || true
+            . "${{CONDA_EXE%/bin/conda}}/etc/profile.d/conda.sh" > /dev/null 2>&1 || . "$(conda info --base 2>/dev/null)/etc/profile.d/conda.sh" > /dev/null 2>&1 || true
             set +a
             {constants.DEACTIVATE_SKY_REMOTE_PYTHON_ENV}
             export PYTHONUNBUFFERED=1
@@ -449,11 +449,13 @@ def _follow_job_logs(file,
     """Yield each line from a file as they are written.
 
     `sleep_sec` is the time to sleep after empty reads. """
+    import time as _time
     line = ''
     # No need to lock the status here, as the while loop can handle
     # the older status.
     status = job_lib.get_status_no_lock(job_id)
     wait_last_logs = True
+    _t_eof = None
     while True:
         tmp = file.readline()
         if tmp is not None and tmp != '':
@@ -470,6 +472,9 @@ def _follow_job_logs(file,
         else:
             # Reach the end of the file, check the status or sleep and
             # retry.
+            if _t_eof is None:
+                _t_eof = _time.perf_counter()
+                yield f'PERF _follow_job_logs: first EOF, status={status}\n'
 
             # Auto-exit the log tailing, if the job has finished. Check
             # the job status before query again to avoid unfinished logs.
@@ -483,13 +488,18 @@ def _follow_job_logs(file,
                     wait_last_logs = False
                     continue
                 status_str = status.value if status is not None else 'None'
+                yield f'PERF _follow_job_logs: exit after {_time.perf_counter()-_t_eof:.3f}s status={status_str}\n'
                 finish = ux_utils.finishing_message(
                     f'Job finished (status: {status_str}).')
                 yield finish + '\n'
                 return
 
             time.sleep(SKY_LOG_TAILING_GAP_SECONDS)
-            status = job_lib.get_status_no_lock(job_id)
+            new_status = job_lib.get_status_no_lock(job_id)
+            if new_status != status:
+                import datetime
+                yield f'DEBUG log_lib: status changed {status} → {new_status} at {datetime.datetime.now().isoformat()}\n'
+            status = new_status
 
 
 def _peek_head_lines(log_file: TextIO) -> List[str]:
@@ -667,11 +677,15 @@ def tail_logs_iter(job_id: Optional[int],
     log_path = os.path.join(log_dir, 'run.log')
     log_path = os.path.expanduser(log_path)
 
+    import time as _time
+    _t0 = _time.perf_counter()
     status = job_lib.update_job_status([job_id], silent=True)[0]
+    yield f'PERF tail_logs_iter update_job_status: {_time.perf_counter()-_t0:.3f}s status={status}\n'
 
     # Wait for the log to be written. This is needed due to the `ray submit`
     # will take some time to start the job and write the log.
     retry_cnt = 0
+    _t_wait = _time.perf_counter()
     while status is not None and not status.is_terminal():
         retry_cnt += 1
         if os.path.exists(log_path) and status != job_lib.JobStatus.INIT:
@@ -688,10 +702,12 @@ def tail_logs_iter(job_id: Optional[int],
         yield waiting + '\n'
         time.sleep(SKY_LOG_WAITING_GAP_SECONDS)
         status = job_lib.update_job_status([job_id], silent=True)[0]
+    yield f'PERF tail_logs_iter wait_for_log: {_time.perf_counter()-_t_wait:.3f}s retries={retry_cnt}\n'
 
     start_stream_at = LOG_FILE_START_STREAMING_AT
     # Explicitly declare the type to avoid mypy warning.
     lines: Iterable[str] = []
+    yield f'PERF tail_logs_iter path: follow={follow} status={status}\n'
     if follow and status in [
             job_lib.JobStatus.SETTING_UP,
             job_lib.JobStatus.PENDING,
