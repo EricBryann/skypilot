@@ -76,8 +76,14 @@ SKY_GET_PYTHON_PATH_CMD = (f'[ -s {SKY_PYTHON_PATH_FILE} ] && '
 # Python executable, e.g., /opt/conda/bin/python3
 SKY_PYTHON_CMD = (f'{SKY_UNSET_PYTHONPATH_AND_SET_CWD} '
                   f'$({SKY_GET_PYTHON_PATH_CMD})')
-# Go executor binary deployed to the cluster during sky launch.
+# Remote bin directory for Go executor binaries. Tilde form is required for
+# rsync targets; use SKY_EXEC_BIN / SKY_AGENT_BIN in shell commands.
+SKY_REMOTE_BIN_DIR = '~/.sky/bin'
+# Go executor binaries deployed to the cluster during sky launch.
 SKY_EXEC_BIN = f'{SKY_RUNTIME_DIR}/.sky/bin/sky-exec'
+SKY_AGENT_BIN = f'{SKY_RUNTIME_DIR}/.sky/bin/sky-agent'
+# gRPC port that sky-agent listens on (must match sky-agent --port default).
+SKY_AGENT_PORT = 50052
 # Prefer SKY_UV_PIP_CMD, which is faster.
 # TODO(cooperc): remove remaining usage (GCP TPU setup).
 SKY_PIP_CMD = f'{SKY_PYTHON_CMD} -m pip'

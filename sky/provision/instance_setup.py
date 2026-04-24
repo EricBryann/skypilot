@@ -582,7 +582,7 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
     def _deploy_node(runner: command_runner.CommandRunner,
                      is_head: bool) -> None:
         arch = _remote_arch(runner)
-        remote_bin_dir = '~/.sky/bin'
+        remote_bin_dir = constants.SKY_REMOTE_BIN_DIR
         _run(runner, f'mkdir -p {remote_bin_dir}')
 
         # sky-agent runs on every node.
@@ -596,11 +596,11 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
                            up=True,
                            stream_logs=False,
                            log_path=log_path)
-        _run(runner, f'chmod +x {remote_bin_dir}/sky-agent')
+        _run(runner, f'chmod +x {constants.SKY_AGENT_BIN}')
         # Start sky-agent in the background; idempotent via pkill+restart.
         _run(runner,
-             f'pkill -f {remote_bin_dir}/sky-agent 2>/dev/null || true; '
-             f'nohup {remote_bin_dir}/sky-agent '
+             f'pkill -f {constants.SKY_AGENT_BIN} 2>/dev/null || true; '
+             f'nohup {constants.SKY_AGENT_BIN} '
              f'> ~/.sky/sky-agent.log 2>&1 & '
              f'echo "sky-agent started with PID $!"')
 
@@ -616,7 +616,7 @@ def deploy_go_executors(cluster_info: common.ClusterInfo,
                                up=True,
                                stream_logs=False,
                                log_path=log_path)
-            _run(runner, f'chmod +x {remote_bin_dir}/sky-exec')
+            _run(runner, f'chmod +x {constants.SKY_EXEC_BIN}')
 
     def _deploy_worker(runner: command_runner.CommandRunner) -> None:
         _deploy_node(runner, is_head=False)

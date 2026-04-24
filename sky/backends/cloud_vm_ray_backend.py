@@ -6345,7 +6345,7 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
             'node_scripts': node_scripts,
             'node_log_paths': node_log_paths,
             'log_dir': log_dir,
-            'agent_port': 50052,
+            'agent_port': constants.SKY_AGENT_PORT,
         }
         from sky.skylet.services import _GO_EXEC_PREFIX  # pylint: disable=import-outside-toplevel
         return _GO_EXEC_PREFIX + json.dumps(config)

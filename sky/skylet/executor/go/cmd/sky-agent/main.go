@@ -15,9 +15,8 @@ import (
 
 	"google.golang.org/grpc"
 	pb "skypilot.dev/executor/gen/agent"
+	"skypilot.dev/executor/pkg/constants"
 )
-
-const defaultPort = 50052
 
 type agentServer struct {
 	pb.UnimplementedAgentServiceServer
@@ -105,7 +104,7 @@ func (s *agentServer) Execute(req *pb.ExecuteRequest, stream pb.AgentService_Exe
 }
 
 func main() {
-	port := flag.Int("port", defaultPort, "Port to listen on")
+	port := flag.Int("port", constants.AgentPort, "Port to listen on")
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))

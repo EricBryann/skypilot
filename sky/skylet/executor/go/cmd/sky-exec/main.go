@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	pb "skypilot.dev/executor/gen/agent"
 	pbskylet "skypilot.dev/executor/gen/skylet"
+	"skypilot.dev/executor/pkg/constants"
 	"skypilot.dev/executor/pkg/db"
 )
 
@@ -74,7 +75,7 @@ func nodePrefix(rank int, ip string, pid int32) string {
 func scheduleStep() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, "localhost:46590",
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("localhost:%d", constants.SkyletPort),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -96,7 +97,7 @@ func main() {
 	}
 
 	if cfg.AgentPort == 0 {
-		cfg.AgentPort = 50052
+		cfg.AgentPort = constants.AgentPort
 	}
 
 	// Expand ~ in paths — Go does not expand tilde automatically.

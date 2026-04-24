@@ -9,9 +9,19 @@ BIN_DIR := ../bin
 TARGETS := sky-exec sky-agent
 ARCHS   := linux/amd64 linux/arm64
 
-.PHONY: all proto deps build cross clean
+.PHONY: all proto constants deps build cross clean
 
-all: proto deps build
+all: constants proto deps build
+
+# --- constants codegen -------------------------------------------------------
+# Single source of truth: sky/skylet/constants.py.  Do not edit the output.
+CONSTANTS_PY := ../../constants.py
+CONSTANTS_GO := pkg/constants/constants.go
+
+constants: $(CONSTANTS_GO)
+
+$(CONSTANTS_GO): $(CONSTANTS_PY) scripts/gen_go_constants.py
+	python3 scripts/gen_go_constants.py
 
 # --- protobuf codegen --------------------------------------------------------
 proto: $(GEN_DIR)/agent.pb.go $(SKYLET_GEN_DIR)/skylet.pb.go
