@@ -30,7 +30,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	pb "skypilot.dev/executor/gen/agent"
 	pbskylet "skypilot.dev/executor/gen/skylet"
-	"skypilot.dev/executor/pkg/constants"
 	"skypilot.dev/executor/pkg/db"
 )
 
@@ -44,7 +43,8 @@ type Config struct {
 	NumGPUsPerNode int      `json:"num_gpus_per_node"` // 0 for CPU-only tasks
 	Script         string   `json:"script"`            // shared script; sky-exec injects per-node env vars
 	LogDir         string   `json:"log_dir"`
-	AgentPort      int      `json:"agent_port"`
+	AgentPort      int      `json:"agent_port"`  // default 50052
+	SkyletPort     int      `json:"skylet_port"` // default 46590
 }
 
 // nodeLogPath returns the log file path for a given rank, matching the
@@ -159,10 +159,10 @@ func nodePrefix(rank int, ip string, pid int32) string {
 
 // scheduleStep calls the skylet's ScheduleStep RPC on localhost to immediately
 // pick up the next pending job after this one finishes.
-func scheduleStep() {
+func scheduleStep(skyletPort int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("localhost:%d", constants.SkyletPort),
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("localhost:%d", skyletPort),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -184,7 +184,10 @@ func main() {
 	}
 
 	if cfg.AgentPort == 0 {
-		cfg.AgentPort = constants.AgentPort
+		cfg.AgentPort = 50052
+	}
+	if cfg.SkyletPort == 0 {
+		cfg.SkyletPort = 46590
 	}
 	// Expand ~ in paths — Go does not expand tilde automatically.
 	home, err := os.UserHomeDir()
@@ -280,7 +283,7 @@ func main() {
 		log.Printf("sky-exec: set exit codes: %v", err)
 	}
 
-	go scheduleStep()
+	go scheduleStep(cfg.SkyletPort)
 
 	if !succeeded {
 		reason := ""

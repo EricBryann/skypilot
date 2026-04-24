@@ -6332,7 +6332,6 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
             'num_gpus_per_node': self._get_num_gpus(task),
             'script': script,
             'log_dir': log_dir,
-            'agent_port': constants.SKY_AGENT_PORT,
         }
         from sky.skylet.services import _GO_EXEC_PREFIX  # pylint: disable=import-outside-toplevel
         return _GO_EXEC_PREFIX + json.dumps(config)

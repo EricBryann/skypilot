@@ -8,19 +8,9 @@ BIN_DIR := ../bin
 
 TARGETS := sky-exec sky-agent
 
-.PHONY: all proto constants deps build clean
+.PHONY: all proto deps build clean
 
-all: constants proto deps build
-
-# --- constants codegen -------------------------------------------------------
-# Single source of truth: sky/skylet/constants.py.  Do not edit the output.
-CONSTANTS_PY := ../../constants.py
-CONSTANTS_GO := pkg/constants/constants.go
-
-constants: $(CONSTANTS_GO)
-
-$(CONSTANTS_GO): $(CONSTANTS_PY) scripts/gen_go_constants.py
-	python3 scripts/gen_go_constants.py
+all: proto deps build
 
 # --- protobuf codegen --------------------------------------------------------
 proto: $(GEN_DIR)/agent.pb.go $(SKYLET_GEN_DIR)/skylet.pb.go

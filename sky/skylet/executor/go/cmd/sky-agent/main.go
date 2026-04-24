@@ -16,7 +16,6 @@ import (
 
 	"google.golang.org/grpc"
 	pb "skypilot.dev/executor/gen/agent"
-	"skypilot.dev/executor/pkg/constants"
 )
 
 type agentServer struct {
@@ -153,7 +152,7 @@ func nonEmptyLines(out []byte) []string {
 }
 
 func main() {
-	port := flag.Int("port", constants.AgentPort, "Port to listen on")
+	port := flag.Int("port", 50052, "Port to listen on")
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))
