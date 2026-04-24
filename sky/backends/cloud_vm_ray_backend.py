@@ -6315,35 +6315,24 @@ class CloudVmRayBackend(backends.Backend['CloudVmRayResourceHandle']):
         if task.run is None:
             return None
 
-        task_ips = internal_ips[:num_actual_nodes]
-        job_ip_list_str = '\n'.join(task_ips)
         unset_ray_env_vars = ' && '.join(
             [f'unset {v}' for v in task_codegen.UNSET_RAY_ENV_VARS])
-        node_scripts: List[str] = []
-        node_log_paths: List[str] = []
-        for rank in range(num_actual_nodes):
-            sky_env_vars = dict(task_env_vars)
-            sky_env_vars[constants.SKYPILOT_NODE_IPS] = job_ip_list_str
-            sky_env_vars[constants.SKYPILOT_NUM_NODES] = str(num_actual_nodes)
-            sky_env_vars[constants.SKYPILOT_NODE_RANK] = str(rank)
-            sky_env_vars['SKYPILOT_INTERNAL_JOB_ID'] = str(job_id)
-            task_bash = task_codegen.TaskCodeGen.build_task_bash_script(
-                task.run, env_prefix=unset_ray_env_vars)
-            node_scripts.append(
-                log_lib.make_task_bash_script(task_bash,
-                                              env_vars=sky_env_vars))
-            if num_actual_nodes == 1:
-                node_log_paths.append(os.path.join(log_dir, 'run.log'))
-            else:
-                node_name = 'head' if rank == 0 else f'worker{rank}'
-                node_log_paths.append(
-                    os.path.join(log_dir, f'{rank}-{node_name}.log'))
+
+        # Build one shared script. SKYPILOT_NODE_IPS, SKYPILOT_NUM_NODES, and
+        # SKYPILOT_NODE_RANK are intentionally omitted — sky-exec injects them
+        # per node at dispatch time using all_node_ips and num_nodes.
+        sky_env_vars = dict(task_env_vars)
+        sky_env_vars['SKYPILOT_INTERNAL_JOB_ID'] = str(job_id)
+        task_bash = task_codegen.TaskCodeGen.build_task_bash_script(
+            task.run, env_prefix=unset_ray_env_vars)
+        script = log_lib.make_task_bash_script(task_bash, env_vars=sky_env_vars)
 
         config = {
             'job_id': job_id,
-            'node_ips': task_ips,
-            'node_scripts': node_scripts,
-            'node_log_paths': node_log_paths,
+            'all_node_ips': internal_ips,
+            'num_nodes': num_actual_nodes,
+            'num_gpus_per_node': self._get_num_gpus(task),
+            'script': script,
             'log_dir': log_dir,
             'agent_port': constants.SKY_AGENT_PORT,
         }

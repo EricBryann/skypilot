@@ -7,6 +7,9 @@ option go_package = "skypilot.dev/executor/gen/agent";
 service AgentService {
   // Execute runs a bash script and streams output back to the caller.
   rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);
+  // GetResources returns available resources on this node so sky-exec can
+  // make informed scheduling decisions before dispatching work.
+  rpc GetResources(GetResourcesRequest) returns (GetResourcesResponse);
 }
 
 message ExecuteRequest {
@@ -20,4 +23,10 @@ message ExecuteResponse {
   int32  exit_code = 2;  // set only when done=true
   bool   done      = 3;
   int32  pid       = 4;  // set only in the first response
+}
+
+message GetResourcesRequest {}
+
+message GetResourcesResponse {
+  int32 free_gpus = 1;  // GPUs with no running compute processes
 }

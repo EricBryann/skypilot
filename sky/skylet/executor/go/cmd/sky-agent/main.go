@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 
 	"google.golang.org/grpc"
 	pb "skypilot.dev/executor/gen/agent"
@@ -101,6 +102,54 @@ func (s *agentServer) Execute(req *pb.ExecuteRequest, stream pb.AgentService_Exe
 	}
 
 	return stream.Send(&pb.ExecuteResponse{Done: true, ExitCode: int32(exitCode)})
+}
+
+// GetResources returns the number of free GPUs on this node.
+// A GPU is considered free if no compute processes are using it.
+func (s *agentServer) GetResources(_ context.Context, _ *pb.GetResourcesRequest) (*pb.GetResourcesResponse, error) {
+	return &pb.GetResourcesResponse{FreeGpus: countFreeGPUs()}, nil
+}
+
+// countFreeGPUs uses nvidia-smi to count GPUs with no running compute processes.
+// Returns 0 if nvidia-smi is unavailable (no GPU node).
+func countFreeGPUs() int32 {
+	// List all GPU UUIDs on this node.
+	totalOut, err := exec.Command("nvidia-smi",
+		"--query-gpu=uuid", "--format=csv,noheader").Output()
+	if err != nil {
+		return 0
+	}
+	totalUUIDs := nonEmptyLines(totalOut)
+	if len(totalUUIDs) == 0 {
+		return 0
+	}
+
+	// List GPU UUIDs that have active compute processes.
+	busyOut, _ := exec.Command("nvidia-smi",
+		"--query-compute-apps=gpu_uuid", "--format=csv,noheader").Output()
+	busy := make(map[string]struct{})
+	for _, line := range nonEmptyLines(busyOut) {
+		busy[line] = struct{}{}
+	}
+
+	free := int32(0)
+	for _, uuid := range totalUUIDs {
+		if _, inUse := busy[uuid]; !inUse {
+			free++
+		}
+	}
+	return free
+}
+
+// nonEmptyLines splits output into trimmed, non-empty lines.
+func nonEmptyLines(out []byte) []string {
+	var lines []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			lines = append(lines, t)
+		}
+	}
+	return lines
 }
 
 func main() {

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v5.29.3
-// source: proto/agent.proto
+// source: agent.proto
 
 package agent
 
@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_Execute_FullMethodName = "/agent.v1.AgentService/Execute"
+	AgentService_Execute_FullMethodName      = "/agent.v1.AgentService/Execute"
+	AgentService_GetResources_FullMethodName = "/agent.v1.AgentService/GetResources"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -28,6 +29,9 @@ const (
 type AgentServiceClient interface {
 	// Execute runs a bash script and streams output back to the caller.
 	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecuteResponse], error)
+	// GetResources returns available resources on this node so sky-exec can
+	// make informed scheduling decisions before dispatching work.
+	GetResources(ctx context.Context, in *GetResourcesRequest, opts ...grpc.CallOption) (*GetResourcesResponse, error)
 }
 
 type agentServiceClient struct {
@@ -57,12 +61,25 @@ func (c *agentServiceClient) Execute(ctx context.Context, in *ExecuteRequest, op
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AgentService_ExecuteClient = grpc.ServerStreamingClient[ExecuteResponse]
 
+func (c *agentServiceClient) GetResources(ctx context.Context, in *GetResourcesRequest, opts ...grpc.CallOption) (*GetResourcesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetResourcesResponse)
+	err := c.cc.Invoke(ctx, AgentService_GetResources_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
 	// Execute runs a bash script and streams output back to the caller.
 	Execute(*ExecuteRequest, grpc.ServerStreamingServer[ExecuteResponse]) error
+	// GetResources returns available resources on this node so sky-exec can
+	// make informed scheduling decisions before dispatching work.
+	GetResources(context.Context, *GetResourcesRequest) (*GetResourcesResponse, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -75,6 +92,9 @@ type UnimplementedAgentServiceServer struct{}
 
 func (UnimplementedAgentServiceServer) Execute(*ExecuteRequest, grpc.ServerStreamingServer[ExecuteResponse]) error {
 	return status.Error(codes.Unimplemented, "method Execute not implemented")
+}
+func (UnimplementedAgentServiceServer) GetResources(context.Context, *GetResourcesRequest) (*GetResourcesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetResources not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -108,13 +128,36 @@ func _AgentService_Execute_Handler(srv interface{}, stream grpc.ServerStream) er
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AgentService_ExecuteServer = grpc.ServerStreamingServer[ExecuteResponse]
 
+func _AgentService_GetResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetResourcesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).GetResources(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_GetResources_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).GetResources(ctx, req.(*GetResourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AgentService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "agent.v1.AgentService",
 	HandlerType: (*AgentServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetResources",
+			Handler:    _AgentService_GetResources_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Execute",
@@ -122,5 +165,5 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/agent.proto",
+	Metadata: "agent.proto",
 }

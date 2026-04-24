@@ -20,6 +20,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -36,12 +38,97 @@ import (
 // db_path and lock_dir are intentionally omitted — sky-exec derives them from
 // $SKY_RUNTIME_DIR (or $HOME) so the API server never needs to expand paths.
 type Config struct {
-	JobID        int      `json:"job_id"`
-	NodeIPs      []string `json:"node_ips"`
-	NodeScripts  []string `json:"node_scripts"`
-	NodeLogPaths []string `json:"node_log_paths"`
-	LogDir       string   `json:"log_dir"`
-	AgentPort    int      `json:"agent_port"`
+	JobID          int      `json:"job_id"`
+	AllNodeIPs     []string `json:"all_node_ips"`      // all cluster IPs; sky-exec selects NumNodes
+	NumNodes       int      `json:"num_nodes"`         // how many nodes the task needs
+	NumGPUsPerNode int      `json:"num_gpus_per_node"` // 0 for CPU-only tasks
+	Script         string   `json:"script"`            // shared script; sky-exec injects per-node env vars
+	LogDir         string   `json:"log_dir"`
+	AgentPort      int      `json:"agent_port"`
+}
+
+// nodeLogPath returns the log file path for a given rank, matching the
+// convention in cloud_vm_ray_backend._build_go_config.
+func nodeLogPath(logDir string, rank, numNodes int) string {
+	if numNodes == 1 {
+		return filepath.Join(logDir, "run.log")
+	}
+	nodeName := fmt.Sprintf("worker%d", rank)
+	if rank == 0 {
+		nodeName = "head"
+	}
+	return filepath.Join(logDir, fmt.Sprintf("%d-%s.log", rank, nodeName))
+}
+
+// shellQuote wraps s in single quotes, escaping any embedded single quotes.
+// Matches Python's shlex.quote used by log_lib.make_task_bash_script.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// queryFreeGPUs calls GetResources on one agent node and returns its free GPU count.
+// Returns 0 on any error so the node is treated as having no available resources.
+func queryFreeGPUs(ctx context.Context, ip string, agentPort int) int32 {
+	addr := fmt.Sprintf("%s:%d", ip, agentPort)
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(dialCtx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Printf("sky-exec: resource query dial %s: %v", addr, err)
+		return 0
+	}
+	defer conn.Close()
+	resp, err := pb.NewAgentServiceClient(conn).GetResources(ctx, &pb.GetResourcesRequest{})
+	if err != nil {
+		log.Printf("sky-exec: GetResources %s: %v", addr, err)
+		return 0
+	}
+	return resp.FreeGpus
+}
+
+// selectNodes queries all cluster nodes in parallel and returns the best
+// NumNodes IPs whose free GPU count satisfies NumGPUsPerNode.
+// Falls back to the first NumNodes IPs if not enough nodes qualify.
+func selectNodes(ctx context.Context, cfg Config) []string {
+	type result struct {
+		ip       string
+		freeGPUs int32
+	}
+	results := make([]result, len(cfg.AllNodeIPs))
+	var wg sync.WaitGroup
+	for i, ip := range cfg.AllNodeIPs {
+		wg.Add(1)
+		go func(i int, ip string) {
+			defer wg.Done()
+			results[i] = result{ip, queryFreeGPUs(ctx, ip, cfg.AgentPort)}
+		}(i, ip)
+	}
+	wg.Wait()
+
+	// Collect nodes that meet the GPU requirement.
+	var candidates []result
+	for _, r := range results {
+		if int(r.freeGPUs) >= cfg.NumGPUsPerNode {
+			candidates = append(candidates, r)
+		}
+	}
+
+	// Sort descending by free GPUs — prefer nodes with the most headroom.
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].freeGPUs > candidates[j].freeGPUs
+	})
+
+	selected := make([]string, 0, cfg.NumNodes)
+	for _, c := range candidates {
+		if len(selected) == cfg.NumNodes {
+			break
+		}
+		selected = append(selected, c.ip)
+	}
+
+	return selected
 }
 
 // runtimeDir returns $SKY_RUNTIME_DIR if set, otherwise $HOME.
@@ -99,21 +186,13 @@ func main() {
 	if cfg.AgentPort == 0 {
 		cfg.AgentPort = constants.AgentPort
 	}
-
 	// Expand ~ in paths — Go does not expand tilde automatically.
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("sky-exec: get home dir: %v", err)
 	}
-	expandHome := func(p string) string {
-		if len(p) >= 2 && p[:2] == "~/" {
-			return filepath.Join(home, p[2:])
-		}
-		return p
-	}
-	cfg.LogDir = expandHome(cfg.LogDir)
-	for i, p := range cfg.NodeLogPaths {
-		cfg.NodeLogPaths[i] = expandHome(p)
+	if strings.HasPrefix(cfg.LogDir, "~/") {
+		cfg.LogDir = filepath.Join(home, cfg.LogDir[2:])
 	}
 
 	// Handle SIGTERM / SIGINT: cancel all in-flight gRPC streams.
@@ -125,6 +204,9 @@ func main() {
 		<-sigCh
 		cancel()
 	}()
+
+	nodeIPs := selectNodes(ctx, cfg)
+	nodeIPsEnv := strings.Join(nodeIPs, "\n")
 
 	rtDir := runtimeDir()
 	dbPath := filepath.Join(rtDir, ".sky", "jobs.db")
@@ -154,7 +236,7 @@ func main() {
 	// and _add_job_started_msg exactly. tail_logs_iter blocks until it sees
 	// LOG_FILE_START_STREAMING_AT = 'Waiting for task resources on '.
 	dim := "\033[2m"
-	n := len(cfg.NodeIPs)
+	n := len(nodeIPs)
 	plural := ""
 	if n > 1 {
 		plural = "s"
@@ -167,14 +249,15 @@ func main() {
 	// mu guards writes to runLog so lines from different nodes don't interleave.
 	var mu sync.Mutex
 
-	exitCodes := make([]int, len(cfg.NodeIPs))
+	exitCodes := make([]int, n)
 	var wg sync.WaitGroup
 
-	for i, ip := range cfg.NodeIPs {
+	for i, ip := range nodeIPs {
 		wg.Add(1)
 		go func(rank int, ip string) {
 			defer wg.Done()
-			exitCodes[rank] = runOnNode(ctx, cfg, ip, rank, runLog, &mu)
+			logPath := nodeLogPath(cfg.LogDir, rank, n)
+			exitCodes[rank] = runOnNode(ctx, cfg, ip, rank, nodeIPsEnv, n, logPath, runLog, &mu)
 		}(i, ip)
 	}
 	wg.Wait()
@@ -226,7 +309,7 @@ func main() {
 
 // runOnNode dials the sky-agent on ip, sends the script, streams log lines,
 // and returns the script's exit code.
-func runOnNode(ctx context.Context, cfg Config, ip string, rank int, runLog io.Writer, mu *sync.Mutex) int {
+func runOnNode(ctx context.Context, cfg Config, ip string, rank int, nodeIPsEnv string, numNodes int, logPath string, runLog io.Writer, mu *sync.Mutex) int {
 	addr := fmt.Sprintf("%s:%d", ip, cfg.AgentPort)
 	dialCtx, dialCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer dialCancel()
@@ -242,21 +325,26 @@ func runOnNode(ctx context.Context, cfg Config, ip string, rank int, runLog io.W
 	defer conn.Close()
 
 	// Open per-node log file.
-	nodeLogPath := cfg.NodeLogPaths[rank]
-	if err := os.MkdirAll(filepath.Dir(nodeLogPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 		writeLine(mu, runLog, nodePrefix(rank, ip, 0), fmt.Sprintf("ERROR: mkdir node log dir: %v", err))
 		return 1
 	}
-	nodeLog, err := os.OpenFile(nodeLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	nodeLog, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		writeLine(mu, runLog, nodePrefix(rank, ip, 0), fmt.Sprintf("ERROR: open node log: %v", err))
 		return 1
 	}
 	defer nodeLog.Close()
 
+	// Inject per-node cluster env vars. Names match constants in
+	// sky/skylet/constants.py; values are shell-quoted like Python's shlex.quote.
+	script := fmt.Sprintf(
+		"export SKYPILOT_NODE_RANK=%d\nexport SKYPILOT_NODE_IPS=%s\nexport SKYPILOT_NUM_NODES=%d\n%s",
+		rank, shellQuote(nodeIPsEnv), numNodes, cfg.Script)
+
 	client := pb.NewAgentServiceClient(conn)
 	stream, err := client.Execute(ctx, &pb.ExecuteRequest{
-		Script:   cfg.NodeScripts[rank],
+		Script:   script,
 		JobId:    int32(cfg.JobID),
 		NodeRank: int32(rank),
 	})
